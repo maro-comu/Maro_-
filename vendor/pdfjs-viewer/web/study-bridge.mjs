@@ -3,6 +3,8 @@ let bridgedDocument = null;
 let bridgeStarted = false;
 let storageSignature = null;
 let storageMonitor = null;
+let eraserActive = false;
+let eraserToolReady = false;
 
 function notify(type, detail = {}, transfer = []) {
   if (window.parent === window) return;
@@ -13,6 +15,9 @@ function attachStorageBridge() {
   const app = window.PDFViewerApplication;
   const documentProxy = app?.pdfDocument;
   if (!documentProxy) return;
+
+  const eraserButton = document.getElementById("studyEraserButton");
+  if (eraserButton) eraserButton.disabled = false;
 
   const storage = documentProxy.annotationStorage;
   if (!storage.onSetModified?.studyPdfBridge) {
@@ -57,6 +62,66 @@ function drawingToolActive() {
   ));
 }
 
+function annotationEditorManager() {
+  return window.PDFViewerApplication?.pdfViewer?._layerProperties?.annotationEditorUIManager;
+}
+
+function setEraserActive(active) {
+  const button = document.getElementById("studyEraserButton");
+  const next = Boolean(active && button && !button.disabled);
+
+  if (next) {
+    const manager = annotationEditorManager();
+    manager?.getActive?.()?.commitOrRemove?.();
+    const activeDrawingButton = document.querySelector(
+      "#editorHighlightButton.toggled, #editorInkButton.toggled"
+    );
+    activeDrawingButton?.click();
+    manager?.unselectAll?.();
+  }
+
+  eraserActive = next;
+  document.documentElement.classList.toggle("study-eraser-active", next);
+  button?.classList.toggle("toggled", next);
+  button?.setAttribute("aria-pressed", String(next));
+}
+
+function eraseAnnotation(event) {
+  if (!eraserActive || event.button !== 0) return;
+  const target = event.target instanceof Element
+    ? event.target.closest(".annotationEditorLayer > .inkEditor, .annotationEditorLayer > .highlightEditor")
+    : null;
+  if (!target) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const manager = annotationEditorManager();
+  const editor = manager?.getEditor?.(target.id);
+  if (!editor) return;
+
+  manager.setSelected?.(editor);
+  manager.delete?.();
+  window.getSelection()?.removeAllRanges();
+  setTimeout(() => {
+    const storage = window.PDFViewerApplication?.pdfDocument?.annotationStorage;
+    notify("study-pdf-dirty", { annotationCount: storage?.size || 0 });
+  }, 0);
+}
+
+function setupEraserTool() {
+  if (eraserToolReady) return;
+  const button = document.getElementById("studyEraserButton");
+  if (!button) return;
+
+  eraserToolReady = true;
+  button.addEventListener("click", () => setEraserActive(!eraserActive));
+  document.addEventListener("click", event => {
+    if (event.target?.closest?.("#editorHighlightButton, #editorInkButton")) {
+      setEraserActive(false);
+    }
+  }, true);
+}
+
 function clearSelectionAfterDrawing(event) {
   if (event.type !== "pointerup" || !drawingToolActive()) return;
   if (event.target?.closest?.("#toolbarContainer")) return;
@@ -85,12 +150,14 @@ document.addEventListener("pointerup", clearSelectionAfterDrawing, true);
 document.addEventListener("pointerup", notifyEditorInteraction, true);
 document.addEventListener("input", notifyEditorInteraction, true);
 document.addEventListener("change", notifyEditorInteraction, true);
+document.addEventListener("pointerdown", eraseAnnotation, true);
 
 function startBridge() {
   const app = window.PDFViewerApplication;
   if (!app || bridgeStarted) return false;
   bridgeStarted = true;
   Promise.resolve(app.initializedPromise).then(() => {
+    setupEraserTool();
     app.eventBus.on("documentloaded", attachStorageBridge);
     app.eventBus.on("pagesloaded", attachStorageBridge);
     attachStorageBridge();

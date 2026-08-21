@@ -29,13 +29,13 @@ See https://github.com/adobe-type-tools/cmap-resources
 
 <!-- This snippet is used in production (included from viewer.html) -->
 <link rel="resource" type="application/l10n" href="locale/locale.json" />
-<script src="../build/pdf.mjs?v=20260821-timer-drawing-2" type="module"></script>
+<script src="../build/pdf.mjs?v=20260821-eraser-hover-2" type="module"></script>
 
     <link rel="stylesheet" href="viewer.css" />
-    <link rel="stylesheet" href="study-drawing.css?v=20260821-timer-drawing-2" />
+    <link rel="stylesheet" href="study-drawing.css?v=20260821-eraser-hover-2" />
 
-  <script src="viewer.mjs?v=20260821-timer-drawing-2" type="module"></script>
-  <script src="study-bridge.mjs?v=20260821-timer-drawing-2" type="module"></script>
+  <script src="viewer.mjs?v=20260821-eraser-hover-2" type="module"></script>
+  <script src="study-bridge.mjs?v=20260821-eraser-hover-2" type="module"></script>
   </head>
 
   <body tabindex="0">
@@ -517,6 +517,20 @@ See https://github.com/adobe-type-tools/cmap-resources
                         </div>
                       </div>
                     </div>
+                  </div>
+                  <div id="studyEraser" class="toolbarButtonWithContainer">
+                    <button
+                      id="studyEraserButton"
+                      class="toolbarButton"
+                      type="button"
+                      disabled="disabled"
+                      aria-pressed="false"
+                      title="필기 지우개"
+                      aria-label="필기 지우개"
+                      tabindex="0"
+                    >
+                      <span>필기 지우개</span>
+                    </button>
                   </div>
                   <div id="editorStamp" class="toolbarButtonWithContainer">
                     <button

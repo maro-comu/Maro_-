@@ -252,7 +252,7 @@
     if(!fileUrl) return "";
     const viewer=new URL("vendor/pdfjs-viewer/web/viewer.html",location.href);
     viewer.searchParams.set("file",fileUrl);
-    viewer.searchParams.set("study","20260821-submit-save-answer-3");
+    viewer.searchParams.set("study","20260821-eraser-hover-2");
     viewer.hash=`page=${Math.max(1,Math.round(Number(page)||1))}&zoom=page-width`;
     return viewer.href;
   }

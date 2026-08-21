@@ -17,3 +17,42 @@
   > :is(.inkEditor, .highlightEditor) * {
   pointer-events: none !important;
 }
+
+/* The eraser only targets strokes created in this viewer, never the PDF text. */
+#studyEraserButton::before {
+  -webkit-mask-image: url("images/editor-toolbar-delete.svg");
+  mask-image: url("images/editor-toolbar-delete.svg");
+}
+
+html.study-eraser-active .annotationEditorLayer.disabled
+  > :is(.inkEditor, .highlightEditor),
+html.study-eraser-active .annotationEditorLayer.disabled
+  > :is(.inkEditor, .highlightEditor) * {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Keep drawing settings out of the way until the matching tool is hovered. */
+#editorHighlight:has(#editorHighlightButton.toggled) #editorHighlightParamsToolbar,
+#editorInk:has(#editorInkButton.toggled) #editorInkParamsToolbar {
+  inset-block-start: 100%;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, visibility 0s linear 120ms;
+}
+
+#editorHighlight:has(#editorHighlightButton.toggled):hover #editorHighlightParamsToolbar,
+#editorInk:has(#editorInkButton.toggled):hover #editorInkParamsToolbar {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+#editorHighlight:has(#editorHighlightButton.toggled) #editorHighlightParamsToolbar::before,
+#editorHighlight:has(#editorHighlightButton.toggled) #editorHighlightParamsToolbar::after,
+#editorInk:has(#editorInkButton.toggled) #editorInkParamsToolbar::before,
+#editorInk:has(#editorInkButton.toggled) #editorInkParamsToolbar::after {
+  display: none;
+}
