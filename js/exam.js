@@ -29,13 +29,14 @@
   let pdfEditRevision=0;
   let pdfViewerDirty=false;
   let activePdfStorageKey="";
+  let persistedPdfStorageKey="";
   let activePdfHasEdits=false;
+  let pdfExportInProgress=0;
   let pdfExportQueue=Promise.resolve();
   let pdfStorePromise=null;
   const pdfExportRequests=new Map();
   const pdfReadyWaiters=new Set();
   let annotations={version:1,pages:{}};
-  let annotationSaveHandle=null;
   let practiceDraftKey="";
   let skippedQuestions=new Set();
   let sessionReviewRecords=null;
@@ -191,7 +192,8 @@
   function cloneAnnotations(){ return cleanAnnotations(JSON.parse(JSON.stringify(annotations||{version:1,pages:{}}))); }
   function hasAnnotations(value=annotations){ return Object.values(value?.pages||{}).some(strokes=>Array.isArray(strokes)&&strokes.length); }
   function currentHasAnnotations(){ return activePdfHasEdits||hasAnnotations(); }
-  function updateAnnotationStatus(text="PDF 필기 자동 저장됨",saving=false){
+  function savedPdfStorageKey(){ return persistedPdfStorageKey||null; }
+  function updateAnnotationStatus(text="PDF 필기는 제출할 때 저장됩니다",saving=false){
     const status=el("annotationSaveStatus");
     if(!status) return;
     status.textContent=text;
@@ -246,11 +248,12 @@
     await writeStoredPdf(toKey,record.blob);
     return true;
   }
-  function pdfViewerUrl(fileUrl){
+  function pdfViewerUrl(fileUrl,page=1){
+    if(!fileUrl) return "";
     const viewer=new URL("vendor/pdfjs-viewer/web/viewer.html",location.href);
     viewer.searchParams.set("file",fileUrl);
-    viewer.searchParams.set("study","20260821-timer-drawing-2");
-    viewer.hash="page=1&zoom=page-width";
+    viewer.searchParams.set("study","20260821-submit-save-answer-3");
+    viewer.hash=`page=${Math.max(1,Math.round(Number(page)||1))}&zoom=page-width`;
     return viewer.href;
   }
   function resolvePdfReady(){
@@ -262,10 +265,13 @@
   function markPdfViewerReady(){
     resolvePdfReady();
     el("pdfDocumentLoading")?.classList.add("hidden");el("pdfDocumentError")?.classList.add("hidden");
-    updateAnnotationStatus(activePdfHasEdits?"저장된 필기 PDF 표시 중 · 변경 시 자동 저장":"PDF의 그리기·텍스트 도구 사용 가능 · 편집 시 자동 저장");
+    updateAnnotationStatus(activePdfHasEdits?"저장된 필기 PDF 표시 중 · 새 필기는 제출할 때 저장":"PDF의 그리기·텍스트 도구 사용 가능 · 필기는 제출할 때 저장");
   }
   function markPdfViewerDirty(){
-    activePdfHasEdits=true;pdfViewerDirty=true;pdfEditRevision+=1;scheduleAnnotationSave();
+    if(pdfExportInProgress>0||(mode==="start"&&submitted)) return;
+    const wasDirty=pdfViewerDirty;
+    activePdfHasEdits=true;pdfViewerDirty=true;pdfEditRevision+=1;
+    if(!wasDirty) updateAnnotationStatus("필기 변경됨 · 제출할 때 함께 저장합니다.");
   }
   function startPdfViewerProbe(generation){
     clearInterval(pdfViewerProbeHandle);pdfViewerProbeHandle=null;pdfViewerStorageSignature=null;
@@ -295,7 +301,7 @@
     if(mode!=="start"||isCsatSession||!paper) return;
     practiceDraftKey=practiceDraftKey||practiceDraftId();
     try{
-      localStorage.setItem(practiceDraftKey,JSON.stringify({version:3,paperId:paper.id,updatedAt:Date.now(),answers:draftAnswers,currentQuestionIndex,skippedQuestions:[...skippedQuestions],annotations:cloneAnnotations(),annotatedPdfKey:activePdfHasEdits?activePdfStorageKey:null,hasAnnotations:currentHasAnnotations()}));
+      localStorage.setItem(practiceDraftKey,JSON.stringify({version:3,paperId:paper.id,updatedAt:Date.now(),answers:draftAnswers,currentQuestionIndex,skippedQuestions:[...skippedQuestions],annotations:cloneAnnotations(),annotatedPdfKey:savedPdfStorageKey(),hasAnnotations:currentHasAnnotations()}));
     }catch(error){ updateAnnotationStatus("저장 공간 부족 · 제출 시 다시 시도",true); }
   }
   function loadPracticeDraft(){
@@ -310,26 +316,14 @@
     if(mode==="review") return;
     if(isCsatSession&&currentSessionStage()?.type==="exam"&&sessionData?.activeSectionId){
       const state=sessionSectionState(sessionData.activeSectionId);
-      state.annotations=cloneAnnotations();state.annotatedPdfKey=activePdfHasEdits?activePdfStorageKey:null;state.hasAnnotations=currentHasAnnotations();state.skippedQuestions=[...skippedQuestions];state.updatedAt=Date.now();persistSession();
+      state.annotations=cloneAnnotations();state.annotatedPdfKey=savedPdfStorageKey();state.hasAnnotations=currentHasAnnotations();state.skippedQuestions=[...skippedQuestions];state.updatedAt=Date.now();persistSession();
     }else savePracticeDraft();
   }
-  function scheduleAnnotationSave(){
-    updateAnnotationStatus("필기 저장 중…",true);
-    clearTimeout(annotationSaveHandle);
-    annotationSaveHandle=setTimeout(()=>{
-      annotationSaveHandle=null;
-      persistPdfEdits(false).catch(error=>{
-        console.warn("PDF 필기 자동 저장 실패",error);
-        updateAnnotationStatus("필기 저장 대기 중 · 제출할 때 다시 저장",true);
-      });
-    },600);
-  }
   async function flushAnnotationSave(targetKey=activePdfStorageKey){
-    if(annotationSaveHandle){clearTimeout(annotationSaveHandle);annotationSaveHandle=null;}
     let saved=!activePdfHasEdits;
     if(activePdfHasEdits){
       try{ saved=await persistPdfEdits(true,targetKey); }
-      catch(error){ console.warn("PDF 필기 최종 저장 실패",error);updateAnnotationStatus("필기 저장 실패 · 마지막 자동 저장본 사용",true); }
+      catch(error){ console.warn("PDF 필기 최종 저장 실패",error);updateAnnotationStatus("필기 저장 실패 · 기존 저장본 사용",true); }
     }
     persistAnnotationDraft();
     return saved;
@@ -364,28 +358,31 @@
     if(!activePdfHasEdits||!targetKey) return false;
     if(!pdfViewerDirty&&!force){persistAnnotationDraft();return true;}
     const task=pdfExportQueue.catch(()=>false).then(async()=>{
-      await waitForPdfViewer();
-      updateAnnotationStatus("편집한 PDF 저장 중…",true);
-      const result=await requestPdfExport(targetKey);
-      if(result.revision===pdfEditRevision) pdfViewerDirty=false;
-      if(String(targetKey)===String(activePdfStorageKey)) persistAnnotationDraft();
-      const savedCount=Number(result.annotationCount)||0;
-      updateAnnotationStatus(`${mode==="review"?"저장된 필기 PDF · 변경 내용 저장됨":"편집한 PDF 자동 저장됨"}${savedCount?` · 필기 ${savedCount}개`:""}`);
-      return true;
+      pdfExportInProgress+=1;
+      try{
+        await waitForPdfViewer();
+        updateAnnotationStatus("편집한 PDF 저장 중…",true);
+        const result=await requestPdfExport(targetKey);
+        if(result.revision===pdfEditRevision) pdfViewerDirty=false;
+        if(String(targetKey)===String(activePdfStorageKey)){persistedPdfStorageKey=String(targetKey);persistAnnotationDraft();}
+        const savedCount=Number(result.annotationCount)||0;
+        updateAnnotationStatus(`${mode==="review"?"저장된 필기 PDF · 변경 내용 저장됨":"편집한 PDF 저장됨"}${savedCount?` · 필기 ${savedCount}개`:""}`);
+        return true;
+      }finally{ pdfExportInProgress=Math.max(0,pdfExportInProgress-1); }
     });
     pdfExportQueue=task.catch(()=>false);
     return task;
   }
   async function finalizePdfForResult(finalKey){
     if(!activePdfHasEdits||!finalKey) return null;
-    const previousKey=activePdfStorageKey;
+    const previousKey=persistedPdfStorageKey||activePdfStorageKey;
     let stored=false;
     try{ stored=await persistPdfEdits(true,finalKey); }
     catch(error){
       console.warn("제출용 PDF 내보내기 실패",error);
-      try{ stored=await copyStoredPdf(previousKey,finalKey); }catch(copyError){ console.warn("마지막 자동 저장 PDF 복사 실패",copyError); }
+      try{ stored=await copyStoredPdf(previousKey,finalKey); }catch(copyError){ console.warn("기존 저장 PDF 복사 실패",copyError); }
     }
-    if(stored){activePdfStorageKey=String(finalKey);activePdfHasEdits=true;persistAnnotationDraft();return activePdfStorageKey;}
+    if(stored){activePdfStorageKey=String(finalKey);persistedPdfStorageKey=activePdfStorageKey;activePdfHasEdits=true;persistAnnotationDraft();return activePdfStorageKey;}
     try{
       const previous=await readStoredPdf(previousKey);
       return previous?.blob?previousKey:null;
@@ -423,8 +420,8 @@
       const rawUrl=paperUrl("question");
       if(!rawUrl) throw new Error("문제 PDF 경로가 없습니다.");
       let sourceUrl=rawUrl;
-      if(activePdfStorageKey){
-        const stored=await readStoredPdf(activePdfStorageKey);
+      if(persistedPdfStorageKey){
+        const stored=await readStoredPdf(persistedPdfStorageKey);
         if(generation!==pdfViewerGeneration) return;
         if(stored?.blob){
           pdfViewerObjectUrl=URL.createObjectURL(stored.blob);
@@ -604,7 +601,7 @@
     const state=sessionSectionState(sessionData.activeSectionId);
     state.answers=collectAnswers();
     state.annotations=cloneAnnotations();
-    state.annotatedPdfKey=activePdfHasEdits?activePdfStorageKey:null;
+    state.annotatedPdfKey=savedPdfStorageKey();
     state.hasAnnotations=currentHasAnnotations();
     state.skippedQuestions=[...skippedQuestions];
     state.currentQuestionIndex=currentQuestionIndex;
@@ -632,7 +629,7 @@
     if(state.submitted){ void advanceSessionStage(false);return; }
     resetSessionPaperUi();
     annotations=cleanAnnotations(state.annotations);skippedQuestions=new Set((state.skippedQuestions||[]).map(Number));
-    activePdfStorageKey=String(state.annotatedPdfKey||sessionPdfStorageId(section.id));activePdfHasEdits=!!state.annotatedPdfKey||!!state.hasAnnotations&&!hasAnnotations(state.annotations);
+    activePdfStorageKey=String(state.annotatedPdfKey||sessionPdfStorageId(section.id));persistedPdfStorageKey=String(state.annotatedPdfKey||"");activePdfHasEdits=!!state.annotatedPdfKey;
     try{ renderPaper(null,state.answers||{},Number(state.currentQuestionIndex)||0); }
     catch(error){ showError(error.message||"영역 문제를 불러오지 못했습니다."); return; }
     el("timeLabel").textContent="남은 시간";
@@ -676,7 +673,7 @@
     const active=String(sessionData.activeSectionId||"")===String(section.id)&&paper?.id===targetPaper.id;
     const answers=active?collectAnswers():Object.fromEntries(entries.map(item=>[item.number,normalizeAnswer(state.answers?.[item.number]??"")]));
     state.answers=answers;state.currentQuestionIndex=active?currentQuestionIndex:Number(state.currentQuestionIndex)||0;
-    if(active){state.annotations=cloneAnnotations();state.annotatedPdfKey=activePdfHasEdits?activePdfStorageKey:null;state.hasAnnotations=currentHasAnnotations();state.skippedQuestions=[...skippedQuestions];}
+    if(active){state.annotations=cloneAnnotations();state.annotatedPdfKey=savedPdfStorageKey();state.hasAnnotations=currentHasAnnotations();state.skippedQuestions=[...skippedQuestions];}
     state.result=state.skipped
       ?{correctCount:0,gradedCount:0,total:0,presentedTotal:entries.length,ungradedCount:entries.length,wrong:[],score:null,skipped:true}
       :gradeWithEntries(entries,answers);
@@ -814,7 +811,7 @@
     let url="";
     if(Catalog?.resolveUrl){ try{ url=Catalog.resolveUrl(targetPaper,"answer"); }catch(error){ url=""; } }
     if(!url&&targetPaper.answerPath) url=new URL(targetPaper.answerPath,location.href).href;
-    return withPdfView(url,targetPaper.answerStartPage);
+    return pdfViewerUrl(url,targetPaper.answerStartPage);
   }
   function openSessionAnswerRecord(record,scroll=true){
     const url=sessionAnswerUrl(record);if(!url) return;
@@ -828,7 +825,7 @@
     const targetPaper=restorePaper(record?.paperSnapshot||{id:record?.paperId});
     if(!targetPaper){showError("이 영역의 문제 PDF 정보를 찾지 못했습니다.");return;}
     paper=targetPaper;config={};annotations=cleanAnnotations(record.annotations);skippedQuestions=new Set((record.skippedQuestions||[]).map(Number));
-    activePdfStorageKey=String(record.annotatedPdfKey||"");activePdfHasEdits=!!record.annotatedPdfKey;
+    activePdfStorageKey=String(record.annotatedPdfKey||"");persistedPdfStorageKey=activePdfStorageKey;activePdfHasEdits=!!record.annotatedPdfKey;
     answerKey=sessionEntries(paper);displayedResult=record.result||gradeWithEntries(answerKey,record.answers||{});submitted=true;
     el("sessionCompleteState").classList.add("hidden");el("sessionScheduleBar").classList.add("hidden");el("sessionAnswerReview").classList.add("hidden");
     const storedGrade=record.resultGrade??record.estimatedGrade??record.grade??estimateGrade(displayedResult.score,displayedResult.gradedCount,displayedResult.presentedTotal);
@@ -967,7 +964,7 @@
     const problemUrl=paperUrl("question");
     if(!problemUrl) throw new Error("문제 PDF 경로가 없습니다.");
     el("openProblemPdfBtn").href=pdfViewerUrl(problemUrl);
-    el("openAnswerPdfBtn").href=withPdfView(paperUrl("answer"),paper.answerStartPage);
+    el("openAnswerPdfBtn").href=pdfViewerUrl(paperUrl("answer"),paper.answerStartPage);
     renderAnswerSheet(initialAnswers||savedResult?.answers||{},preferredQuestionIndex);
 
     el("loadingState").classList.add("hidden");
@@ -1146,8 +1143,8 @@
       el("wrongAnswerGuide").classList.remove("hidden");
     }
     const answerUrl=paperUrl("answer");
-    if(answerUrl&&(result.wrong.length||result.ungradedCount)){
-      el("answerPdfFrame").src=withPdfView(answerUrl,paper.answerStartPage);
+    if(answerUrl){
+      el("answerPdfFrame").src=pdfViewerUrl(answerUrl,paper.answerStartPage);
       el("answerPdfSection").classList.remove("hidden");
       if(options.scroll!==false) setTimeout(()=>el("answerPdfSection").scrollIntoView({behavior:"smooth",block:"start"}),180);
     }
@@ -1186,7 +1183,7 @@
     answerKey=keyEntries(saved.answerKey||paper.answerKey,saved.totalQuestions||paper.questionCount,paper,true);
     if(!answerKey.length){ showError("저장된 기록의 정답 키를 읽지 못했습니다."); return; }
     annotations=cleanAnnotations(saved.annotations);skippedQuestions=new Set((saved.skippedQuestions||[]).map(Number));
-    activePdfStorageKey=String(saved.annotatedPdfKey||"");activePdfHasEdits=!!saved.annotatedPdfKey;
+    activePdfStorageKey=String(saved.annotatedPdfKey||"");persistedPdfStorageKey=activePdfStorageKey;activePdfHasEdits=!!saved.annotatedPdfKey;
     sessionSeconds=Number(saved.seconds||0);
     el("timeLabel").textContent="풀이시간";
     el("examTimer").textContent=formatTime(sessionSeconds);if(el("panelExamTimer"))el("panelExamTimer").textContent=formatTime(sessionSeconds);
@@ -1215,7 +1212,7 @@
     const draft=loadPracticeDraft();
     if(draft){annotations=cleanAnnotations(draft.annotations);skippedQuestions=new Set((draft.skippedQuestions||[]).map(Number));}
     else{annotations={version:1,pages:{}};skippedQuestions=new Set();}
-    activePdfStorageKey=String(draft?.annotatedPdfKey||practicePdfStorageId());activePdfHasEdits=!!draft?.annotatedPdfKey;
+    activePdfStorageKey=String(draft?.annotatedPdfKey||practicePdfStorageId());persistedPdfStorageKey=String(draft?.annotatedPdfKey||"");activePdfHasEdits=!!draft?.annotatedPdfKey;
     try{ renderPaper(null,draft?.answers||{},Number(draft?.currentQuestionIndex)||0); }catch(error){ showError(error.message||"PDF 정보를 불러오지 못했습니다."); return; }
     syncTimerState();
     tickHandle=setInterval(updateTimer,250);

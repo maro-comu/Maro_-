@@ -71,7 +71,7 @@
             <strong id="panelExamTimer">00:00:00</strong>
           </div>
           <a id="openProblemPdfBtn" class="outline-link" target="_blank">PDF 새 창으로 보기 · 필기는 현재 창에서</a>
-          <span id="annotationSaveStatus" class="annotation-save-status" role="status">PDF 필기 자동 저장 준비 중</span>
+          <span id="annotationSaveStatus" class="annotation-save-status" role="status">PDF 필기는 제출할 때 저장됩니다</span>
         </div>
         <div class="card-heading answer-heading">
           <div>
@@ -92,7 +92,7 @@
             <label class="question-jump-label"><span>바로가기</span><select id="questionJumpSelect" aria-label="답을 입력할 문항 선택"></select></label>
           </div>
           <div class="question-progress-track" aria-hidden="true"><span id="questionProgressBar"></span></div>
-          <p id="answerNotice" class="answer-notice">왼쪽 PDF 상단의 ‘그리기’를 사용하세요. 답안과 편집된 PDF는 자동 저장됩니다.</p>
+          <p id="answerNotice" class="answer-notice">왼쪽 PDF 상단의 ‘그리기’를 사용하세요. 답안은 저장되고 PDF 필기는 제출할 때 함께 저장됩니다.</p>
           <form id="answerSheet" class="answer-sheet" autocomplete="off"></form>
           <p id="currentQuestionOrigin" class="current-question-origin">2022년도 · 1번 문제</p>
           <div class="answer-navigation three-way">
@@ -136,9 +136,9 @@
     <section id="answerPdfSection" class="answer-pdf-section hidden">
       <div class="card-heading">
         <div>
-          <span class="section-kicker danger">오답 정답지</span>
+          <span class="section-kicker">정답 및 해설</span>
           <h2>정답 및 해설 PDF</h2>
-          <p>오답이 있어 자동으로 공개했습니다. 해당 번호의 풀이를 확인해 보세요.</p>
+          <p>제출한 답안과 정답·해설을 확인하세요.</p>
         </div>
         <a id="openAnswerPdfBtn" class="outline-link" target="_blank" rel="noopener">정답·해설 원본 PDF · 큰 팝업으로 열기</a>
       </div>
@@ -202,6 +202,6 @@
   <script src="js/github-pages-config.js?v=20260821-github-pages-2"></script>
   <script src="data/pdf-catalog.js?v=20260821-github-pages-2"></script>
   <script src="js/state.js?v=20260821-github-pages-2"></script>
-  <script src="js/exam.js?v=20260821-timer-drawing-2"></script>
+  <script src="js/exam.js?v=20260821-submit-save-answer-3"></script>
 </body>
 </html>
