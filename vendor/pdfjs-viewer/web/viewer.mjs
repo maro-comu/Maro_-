@@ -24965,7 +24965,7 @@ PDFPrintServiceFactory.initGlobals(PDFViewerApplication);
       return;
     }
     const viewerOrigin = URL.parse(window.location)?.origin || "null";
-    if (HOSTED_VIEWER_ORIGINS.has(viewerOrigin)) {
+    if (HOSTED_VIEWER_ORIGINS.has(viewerOrigin) || /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(viewerOrigin)) {
       return;
     }
     const fileOrigin = URL.parse(file, window.location)?.origin;

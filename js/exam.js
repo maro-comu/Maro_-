@@ -24,6 +24,8 @@
   let pdfViewerReady=false;
   let pdfViewerObjectUrl="";
   let pdfViewerReadyTimeout=null;
+  let pdfViewerProbeHandle=null;
+  let pdfViewerStorageSignature=null;
   let pdfEditRevision=0;
   let pdfViewerDirty=false;
   let activePdfStorageKey="";
@@ -256,6 +258,30 @@
     pdfReadyWaiters.forEach(waiter=>{clearTimeout(waiter.timer);waiter.resolve(true);});
     pdfReadyWaiters.clear();
   }
+  function markPdfViewerReady(){
+    resolvePdfReady();
+    el("pdfDocumentLoading")?.classList.add("hidden");el("pdfDocumentError")?.classList.add("hidden");
+    updateAnnotationStatus(activePdfHasEdits?"저장된 필기 PDF 표시 중 · 변경 시 자동 저장":"PDF의 그리기·텍스트 도구 사용 가능 · 편집 시 자동 저장");
+  }
+  function markPdfViewerDirty(){
+    activePdfHasEdits=true;pdfViewerDirty=true;pdfEditRevision+=1;scheduleAnnotationSave();
+  }
+  function startPdfViewerProbe(generation){
+    clearInterval(pdfViewerProbeHandle);pdfViewerProbeHandle=null;pdfViewerStorageSignature=null;
+    const probe=()=>{
+      if(generation!==pdfViewerGeneration){clearInterval(pdfViewerProbeHandle);pdfViewerProbeHandle=null;return;}
+      try{
+        const documentProxy=el("problemPdfFrame")?.contentWindow?.PDFViewerApplication?.pdfDocument;
+        if(!documentProxy) return;
+        if(!pdfViewerReady) markPdfViewerReady();
+        const storage=documentProxy.annotationStorage;
+        const signature=`${storage?.size||0}:${storage?.serializable?.hash||""}`;
+        if(pdfViewerStorageSignature===null) pdfViewerStorageSignature=signature;
+        else if(signature!==pdfViewerStorageSignature){pdfViewerStorageSignature=signature;markPdfViewerDirty();}
+      }catch(error){ /* 원본 PDF 대체 화면처럼 다른 출처인 경우에는 메시지 브리지를 사용합니다. */ }
+    };
+    pdfViewerProbeHandle=setInterval(probe,350);probe();
+  }
   function waitForPdfViewer(timeout=12000){
     if(pdfViewerReady) return Promise.resolve(true);
     return new Promise((resolve,reject)=>{
@@ -308,9 +334,21 @@
     return saved;
   }
 
-  function requestPdfExport(storageKey){
+  async function requestPdfExport(storageKey){
     const frame=el("problemPdfFrame");
     if(!frame?.contentWindow) return Promise.reject(new Error("PDF 편집기 창을 찾지 못했습니다."));
+    try{
+      const app=frame.contentWindow.PDFViewerApplication;
+      const documentProxy=app?.pdfDocument;
+      if(documentProxy){
+        app.pdfViewer?._layerProperties?.annotationEditorUIManager?.unselectAll?.();
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const data=await documentProxy.saveDocument();
+        const buffer=data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
+        await writeStoredPdf(storageKey,buffer);
+        return {storageKey:String(storageKey),revision:pdfEditRevision,annotationCount:Number(documentProxy.annotationStorage?.size)||0};
+      }
+    }catch(error){ console.warn("PDF 직접 저장을 사용할 수 없어 메시지 저장으로 전환합니다.",error); }
     const requestId=`pdf-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve,reject)=>{
       const timeout=setTimeout(()=>{
@@ -356,6 +394,7 @@
   function destroyPdfView(){
     pdfViewerGeneration+=1;pdfViewerReady=false;pdfViewerDirty=false;
     clearTimeout(pdfViewerReadyTimeout);pdfViewerReadyTimeout=null;
+    clearInterval(pdfViewerProbeHandle);pdfViewerProbeHandle=null;pdfViewerStorageSignature=null;
     pdfReadyWaiters.forEach(waiter=>{clearTimeout(waiter.timer);waiter.reject(new Error("PDF 문서가 변경되었습니다."));});pdfReadyWaiters.clear();
     pdfExportRequests.forEach(request=>{clearTimeout(request.timeout);request.reject(new Error("PDF 문서가 변경되었습니다."));});pdfExportRequests.clear();
     if(pdfViewerObjectUrl){URL.revokeObjectURL(pdfViewerObjectUrl);pdfViewerObjectUrl="";}
@@ -396,6 +435,7 @@
       const viewer=pdfViewerUrl(sourceUrl);
       el("problemPdfFrame").src=viewer;
       el("openProblemPdfBtn").href=viewer;
+      startPdfViewerProbe(generation);
       pdfViewerReadyTimeout=setTimeout(()=>{
         if(generation===pdfViewerGeneration&&!pdfViewerReady) showPdfFallback(new Error("PDF 편집기 준비 시간이 초과되었습니다."));
       },25000);
@@ -410,13 +450,11 @@
     if(event.origin!==location.origin||event.source!==frame?.contentWindow) return;
     const message=event.data||{};
     if(message.type==="study-pdf-ready"){
-      resolvePdfReady();
-      el("pdfDocumentLoading")?.classList.add("hidden");el("pdfDocumentError")?.classList.add("hidden");
-      updateAnnotationStatus(activePdfHasEdits?"저장된 필기 PDF 표시 중 · 변경 시 자동 저장":"PDF의 그리기·텍스트 도구 사용 가능 · 편집 시 자동 저장");
+      markPdfViewerReady();
       return;
     }
     if(message.type==="study-pdf-dirty"){
-      activePdfHasEdits=true;pdfViewerDirty=true;pdfEditRevision+=1;scheduleAnnotationSave();return;
+      markPdfViewerDirty();return;
     }
     if(message.type!=="study-pdf-exported"&&message.type!=="study-pdf-export-error") return;
     const request=pdfExportRequests.get(String(message.requestId||""));
