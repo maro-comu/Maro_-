@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="description" content="수능·모의고사 전체 PDF를 보며 답안을 입력하고 PDF 자체 도구로 필기하는 실전 풀이 화면">
+  <meta name="robots" content="noindex">
+  <title>랜덤 PDF 기출 풀이</title>
+  <link rel="stylesheet" href="css/exam.css?v=20260821-pdf-editor-grade-2">
+</head>
+<body>
+  <main class="exam-shell">
+    <header class="exam-topbar">
+      <div class="exam-heading">
+        <span id="examModeBadge" class="mode-badge">PDF 랜덤 기출</span>
+        <h1 id="examTitle">기출문제를 준비하고 있습니다</h1>
+        <p id="examSubtitle">문제 PDF와 정답지를 연결하는 중입니다.</p>
+      </div>
+      <div class="exam-time-box">
+        <span id="timeLabel">순수 풀이시간</span>
+        <strong id="examTimer">00:00:00</strong>
+      </div>
+    </header>
+
+    <section id="configSummary" class="config-summary" aria-live="polite"></section>
+
+    <section id="sessionScheduleBar" class="session-schedule-bar hidden" aria-live="polite">
+      <div class="session-schedule-heading">
+        <div>
+          <span id="sessionStageBadge" class="section-kicker">수능 모의 세션</span>
+          <strong id="sessionStageTitle">일정을 준비하고 있습니다</strong>
+        </div>
+        <p id="sessionNextStage">다음 일정을 계산하는 중입니다.</p>
+      </div>
+      <ol id="sessionScheduleList" class="session-schedule-list"></ol>
+    </section>
+
+    <section id="loadingState" class="loading-state">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      <b>PDF 기출을 불러오는 중입니다</b>
+      <p>잠시만 기다려 주세요.</p>
+    </section>
+
+    <section id="examWorkspace" class="paper-workspace hidden">
+      <article class="pdf-card">
+        <div id="pdfDocumentViewport" class="pdf-document-viewport">
+          <iframe id="problemPdfFrame" class="problem-pdf-frame" title="필기 가능한 전체 문제 PDF" loading="eager"></iframe>
+          <div id="pdfDocumentLoading" class="pdf-document-loading">
+            <span class="loading-spinner" aria-hidden="true"></span>
+            <b>필기 가능한 PDF 전체 문서를 불러오는 중입니다</b>
+          </div>
+          <div id="pdfDocumentError" class="pdf-document-error hidden" role="status">
+            <p id="pdfDocumentErrorText">PDF 뷰어를 불러오지 못했습니다.</p>
+            <button id="retryPdfRenderBtn" class="tool-btn" type="button">PDF 다시 불러오기</button>
+          </div>
+        </div>
+      </article>
+
+      <aside id="answerCard" class="answer-card">
+        <div class="answer-exam-summary">
+          <div>
+            <span class="section-kicker">PDF 실전 풀이</span>
+            <strong id="panelExamTitle">기출 문제 PDF</strong>
+            <small id="panelExamMeta">PDF 상단의 그리기 도구를 사용할 수 있습니다.</small>
+          </div>
+          <div class="panel-time-box">
+            <span>풀이시간</span>
+            <strong id="panelExamTimer">00:00:00</strong>
+          </div>
+          <a id="openProblemPdfBtn" class="outline-link" target="_blank">PDF 새 창으로 보기 · 필기는 현재 창에서</a>
+          <span id="annotationSaveStatus" class="annotation-save-status" role="status">PDF 필기 자동 저장 준비 중</span>
+        </div>
+        <div class="card-heading answer-heading">
+          <div>
+            <span class="section-kicker">답안 입력</span>
+            <h2 id="currentAnswerTitle">현재 문항 답안</h2>
+          </div>
+          <div class="answer-heading-actions">
+            <strong id="answerProgress">0 / 0</strong>
+            <button id="toggleAnswerPanelBtn" class="answer-collapse-btn" type="button" aria-expanded="true" aria-label="답안 패널 접기">−</button>
+          </div>
+        </div>
+        <div id="answerCardBody" class="answer-card-body">
+          <div class="answer-position">
+            <div>
+              <strong id="currentQuestionLabel">1번 문제</strong>
+              <span id="currentQuestionMeta">1 / 1</span>
+            </div>
+            <label class="question-jump-label"><span>바로가기</span><select id="questionJumpSelect" aria-label="답을 입력할 문항 선택"></select></label>
+          </div>
+          <div class="question-progress-track" aria-hidden="true"><span id="questionProgressBar"></span></div>
+          <p id="answerNotice" class="answer-notice">왼쪽 PDF 상단의 ‘그리기’를 사용하세요. 답안과 편집된 PDF는 자동 저장됩니다.</p>
+          <form id="answerSheet" class="answer-sheet" autocomplete="off"></form>
+          <p id="currentQuestionOrigin" class="current-question-origin">2022년도 · 1번 문제</p>
+          <div class="answer-navigation three-way">
+            <button id="answerPreviousBtn" class="close-btn" type="button">← 이전</button>
+            <button id="skipQuestionBtn" class="close-btn skip-btn" type="button">문제 스킵</button>
+            <button id="answerNextBtn" class="finish-btn" type="button">다음 →</button>
+          </div>
+          <button id="skipSubjectBtn" class="subject-skip-btn hidden" type="button">이 과목 스킵</button>
+
+          <footer id="examFooter" class="exam-footer hidden">
+            <p id="examNotice">이 창이 화면에 보이고 선택되어 있을 때만 순수 공부시간이 누적됩니다.</p>
+            <div>
+              <button id="finishExamBtn" type="button" class="finish-btn">답안 제출·자동 채점</button>
+              <button id="returnSessionResultsBtn" type="button" class="close-btn hidden">전체 결과로 돌아가기</button>
+              <button id="closeReviewBtn" type="button" class="close-btn hidden">다시보기 닫기</button>
+            </div>
+          </footer>
+
+          <section id="gradeSummary" class="grade-summary hidden" aria-live="polite">
+            <div class="grade-score">
+              <span>정답률</span>
+              <strong id="gradePercent">0%</strong>
+              <em id="gradeEstimate">예상 -등급</em>
+            </div>
+            <div>
+              <b id="gradeHeadline">채점 결과</b>
+              <p id="gradeDetail"></p>
+            </div>
+            <p id="gradeCutGuide" class="grade-cut-guide"></p>
+          </section>
+
+          <section id="wrongAnswerGuide" class="wrong-answer-guide hidden">
+            <h3>오답 바로 확인</h3>
+            <p>번호를 누르면 해당 답안을 확인할 수 있습니다. 정답·해설 PDF는 아래에 표시됩니다.</p>
+            <div id="wrongAnswerList" class="wrong-answer-list"></div>
+          </section>
+        </div>
+      </aside>
+    </section>
+
+    <section id="answerPdfSection" class="answer-pdf-section hidden">
+      <div class="card-heading">
+        <div>
+          <span class="section-kicker danger">오답 정답지</span>
+          <h2>정답 및 해설 PDF</h2>
+          <p>오답이 있어 자동으로 공개했습니다. 해당 번호의 풀이를 확인해 보세요.</p>
+        </div>
+        <a id="openAnswerPdfBtn" class="outline-link" target="_blank" rel="noopener">정답·해설 원본 PDF · 큰 팝업으로 열기</a>
+      </div>
+      <div class="pdf-frame-wrap answer-frame-wrap">
+        <iframe id="answerPdfFrame" class="pdf-frame" title="정답 및 해설 PDF"></iframe>
+      </div>
+    </section>
+
+    <section id="sessionBreakState" class="session-break-state hidden" aria-live="polite">
+      <span class="break-icon" aria-hidden="true">☕</span>
+      <span class="section-kicker">시험 사이 휴식</span>
+      <h2 id="sessionBreakTitle">잠시 쉬는 시간입니다</h2>
+      <strong id="sessionBreakTimer">00:00</strong>
+      <p id="sessionBreakNext">다음 시험을 준비하고 있습니다.</p>
+      <button id="skipBreakBtn" type="button" class="finish-btn">휴식 건너뛰기</button>
+    </section>
+
+    <section id="sessionCompleteState" class="session-complete-state hidden" aria-live="polite">
+      <div class="session-complete-hero">
+        <span class="section-kicker">전체 일정 종료</span>
+        <h2>수능 모의 세션을 마쳤습니다</h2>
+        <strong id="sessionOverallScore">자동채점 0%</strong>
+        <p id="sessionCompleteDetail"></p>
+      </div>
+      <div id="sessionResultCards" class="session-result-cards"></div>
+      <section id="sessionAnswerReview" class="session-answer-review hidden">
+        <div class="card-heading">
+          <div>
+            <span class="section-kicker danger">영역별 정답·해설</span>
+            <h2 id="sessionAnswerTitle">정답지</h2>
+            <p id="sessionAnswerNotice">오답과 채점 제외 문항을 직접 확인하세요.</p>
+          </div>
+          <a id="openSessionAnswerBtn" class="outline-link" target="_blank" rel="noopener">정답·해설 원본 PDF · 큰 팝업으로 열기</a>
+        </div>
+        <div class="pdf-frame-wrap answer-frame-wrap">
+          <iframe id="sessionAnswerPdfFrame" class="pdf-frame" title="선택 영역 정답 및 해설 PDF"></iframe>
+        </div>
+      </section>
+      <button id="closeSessionBtn" type="button" class="close-btn session-close-btn">시험 창 닫기</button>
+    </section>
+
+    <section id="examError" class="error-state hidden" role="alert">
+      <b>기출문제를 열지 못했습니다.</b>
+      <p id="examErrorMessage">앱을 다시 열어 주세요.</p>
+      <button id="closeErrorBtn" type="button" class="close-btn">창 닫기</button>
+    </section>
+
+  </main>
+
+  <div id="confirmLayer" class="confirm-layer hidden">
+    <div class="confirm-card">
+      <h2 id="confirmTitle">답안을 제출할까요?</h2>
+      <p id="confirmMessage">미응답도 오답으로 채점됩니다. 오답이 있으면 정답·해설 PDF가 즉시 표시됩니다.</p>
+      <div class="confirm-actions">
+        <button id="cancelFinishBtn" type="button" class="close-btn">계속 풀기</button>
+        <button id="confirmFinishBtn" type="button" class="finish-btn">제출하고 채점</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/github-pages-config.js?v=20260821-github-pages-1"></script>
+  <script src="data/pdf-catalog.js?v=20260821-github-pages-1"></script>
+  <script src="js/state.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/exam.js?v=20260821-pdf-editor-grade-2"></script>
+</body>
+</html>

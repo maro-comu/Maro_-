@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="description" content="2022학년도 이후 수능·모의고사 PDF를 풀고 답안, 채점 결과, 예상 등급과 PDF 필기를 저장하는 수능 공부 앱">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ko_KR">
+  <meta property="og:title" content="수능 공부 메이트">
+  <meta property="og:description" content="전체 PDF 실전 풀이 · 답안 채점 · 예상 등급 · PDF 필기 저장">
+  <meta property="og:url" content="https://maro-comu.github.io/Maro_-/">
+  <meta property="og:image" content="https://maro-comu.github.io/Maro_-/social-preview.png">
+  <link rel="canonical" href="https://maro-comu.github.io/Maro_-/">
+  <title>수능 공부 메이트 - CSAT Study Hub</title>
+  <link rel="stylesheet" href="css/main.css?v=20260821-pdf-editor-grade-2">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <div class="brand-icon">🎓</div>
+          <div>
+            <h1>수능 공부 메이트</h1>
+            <p>CSAT PASS HUB</p>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-btn active" data-tab="dashboard"><span>📊</span>대시보드</button>
+          <button class="nav-btn" data-tab="practice"><span>✏️</span>연습</button>
+          <button class="nav-btn" data-tab="csat-exam"><span>📝</span>수능 연습</button>
+        </nav>
+      </div>
+
+      <div class="target-card">
+        <div class="target-card-head">
+          <span>목표 대학 / 직접 입력 학과</span>
+          <button id="openTargetModalBtn" class="link-btn">수정</button>
+        </div>
+        <strong id="displayTargetUni">목표 대학 미설정</strong>
+        <p id="displayTargetMajor">학과 미설정</p>
+        <div class="target-mini-row"><span>자동 학습목표 등급</span><b id="displayTargetGrade">-</b></div>
+        <small id="displayTargetEstimateMeta" class="target-estimate-meta">공식 입결 아님</small>
+        <button id="openAdmissionSearchBtn" class="small-outline-btn">공식 입시정보 확인하기</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="dday">D-<span id="ddayCount">00</span></div>
+          <div>
+            <p id="csatDateString" class="topbar-title">2027학년도 수능</p>
+            <p class="topbar-sub">PDF 풀이 창이 화면에 보이고 선택된 동안에만 기록됩니다.</p>
+          </div>
+        </div>
+        <div class="study-time-box">
+          <span>오늘 순수 공부시간</span>
+          <b id="headerTodayTime">00:00:00</b>
+          <i id="timerStatusDot" class="timer-dot"></i>
+        </div>
+      </header>
+
+      <div class="page-wrap">
+        <section id="dashboard-view" class="tab-view active">
+          <div class="page-title-row">
+            <div>
+              <h2>대시보드</h2>
+              <p>날짜별로 일반 문제 연습과 수능 연습 결과를 따로 모아봅니다.</p>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <article class="summary-card">
+              <span>오늘 순수 공부시간</span>
+              <strong id="dashTodayTime">0시간 0분</strong>
+              <small>실제 PDF 풀이 창에 집중한 시간만 합산</small>
+            </article>
+            <article class="summary-card">
+              <span>오늘 일반 문제 세션</span>
+              <strong id="dashProblemSessions">0회</strong>
+              <small>점수 · 오답 · 오답 해설 저장</small>
+            </article>
+            <article class="summary-card">
+              <span>오늘 수능 연습</span>
+              <strong id="dashCsatSessions">0회</strong>
+              <small>정답률·오답과 학습목표 등급 기록</small>
+            </article>
+          </div>
+
+          <div class="info-banner">
+            실제 기출 전체 PDF와 독립된 답안 영역을 나란히 두고 풉니다. 답안과 PDF 필기를 저장하며, 제출 후 오답 정답·해설과 예상 등급을 확인할 수 있습니다.
+          </div>
+
+          <div id="dailyDashboard" class="day-list"></div>
+        </section>
+
+        <section id="practice-view" class="tab-view">
+          <div class="page-title-row">
+            <div>
+              <h2>과목별 랜덤 PDF 기출</h2>
+              <p>영역과 세부과목을 고르면 2022년도 이후 문제지를 고화질 전체 PDF로 열고 그 위에 직접 필기합니다.</p>
+            </div>
+          </div>
+
+          <div class="subject-grid">
+            <button class="subject-card" data-area="국어"><b>국</b><span><strong>국어 영역</strong><small>화법과 작문 · 언어와 매체</small></span></button>
+            <button class="subject-card" data-area="수학"><b>수</b><span><strong>수학 영역</strong><small>확률과 통계 · 미적분 · 기하</small></span></button>
+            <button class="subject-card" data-area="영어"><b>영</b><span><strong>영어 영역</strong><small>음원 미포함 · 독해 18~45번</small></span></button>
+            <button class="subject-card" data-area="한국사"><b>한</b><span><strong>한국사 영역</strong><small>필수 지정 과목</small></span></button>
+            <button class="subject-card" data-area="사회탐구"><b>사</b><span><strong>사회탐구 영역</strong><small>생활과 윤리부터 사회·문화까지</small></span></button>
+            <button class="subject-card" data-area="과학탐구"><b>과</b><span><strong>과학탐구 영역</strong><small>물리학·화학·생명과학·지구과학</small></span></button>
+          </div>
+
+          <div id="practiceTopicPanel" class="topic-panel panel hidden">
+            <div class="topic-panel-head">
+              <div><span class="eyebrow">세부과목</span><h3 id="practiceAreaTitle">영역을 선택해 주세요</h3></div>
+              <span id="practicePoolCount" class="pool-count">0회분</span>
+            </div>
+            <div id="practiceTopicGrid" class="topic-chip-grid"></div>
+            <div class="source-filter" aria-label="시험 종류 선택">
+              <span>출제 범위</span>
+              <label><input type="radio" name="practice-source" value="" checked> 전체 랜덤</label>
+              <label><input type="radio" name="practice-source" value="모의고사"> 모의고사</label>
+              <label><input type="radio" name="practice-source" value="수능"> 수능</label>
+            </div>
+          </div>
+
+          <div class="practice-panel panel">
+            <div>
+              <span class="eyebrow">선택한 랜덤 풀</span>
+              <h3 id="selectedPracticeSubject">영역과 세부과목을 선택해 주세요</h3>
+              <p id="practiceStatusText">2022년도 이후 문제·정답 PDF를 전체 문서 형태로 출제합니다.</p>
+            </div>
+            <div class="timer-control">
+              <button id="startPracticeBtn" class="primary-btn" disabled>랜덤 PDF 열기</button>
+            </div>
+          </div>
+
+          <div class="pdf-ready-box">
+            <div>📚</div>
+            <h3>전체 PDF 실전 풀이 · 필기 자동 저장 · 결과 다시보기</h3>
+            <p>문제지 전체와 오른쪽 답안 영역을 서로 겹치지 않게 나눠 표시합니다. PDF 위 필기는 자동 저장되어 시험이 끝난 뒤 대시보드 다시보기에도 그대로 나타납니다.</p>
+          </div>
+        </section>
+
+        <section id="csat-exam-view" class="tab-view">
+          <div class="page-title-row">
+            <div>
+              <h2>선택 과목 수능 실전 연습</h2>
+              <p>체크하거나 고른 과목만 실제 제한시간으로 풀고, 과목 사이에는 10분씩 쉽니다. 필요 없는 과목과 입실·대기 과정은 건너뜁니다.</p>
+            </div>
+          </div>
+
+          <div class="csat-order-strip" aria-label="선택 과목 연습 흐름">
+            <span><b>선택 1</b>첫 과목 · 실제 제한시간</span><i>10분 휴식</i>
+            <span><b>선택 2+</b>고른 순서대로 연속 진행</span><i>반복</i>
+            <span><b>종료</b>자동 채점 · 결과 확인</span>
+          </div>
+
+          <div class="csat-config-grid">
+            <div class="panel csat-config-panel">
+              <div class="panel-heading"><span class="badge indigo">주요 과목</span><h3>국어 · 수학 · 영어</h3></div>
+              <p class="panel-description">풀 과목만 체크하세요. 체크하지 않은 과목은 대기 없이 완전히 건너뜁니다.</p>
+              <div class="csat-config-list">
+                <div class="csat-config-row">
+                  <label class="csat-include"><input id="includeKorean" type="checkbox" checked><span><b>국어</b><small>80분 · 독서·문학 + 선택</small></span></label>
+                  <div class="choice-grid two compact-choices">
+                    <label class="choice"><input type="radio" name="korean-elective" value="화법과 작문" checked>화법과 작문</label>
+                    <label class="choice"><input type="radio" name="korean-elective" value="언어와 매체">언어와 매체</label>
+                  </div>
+                </div>
+                <div class="csat-config-row">
+                  <label class="csat-include"><input id="includeMath" type="checkbox" checked><span><b>수학</b><small>100분 · 수학Ⅰ·Ⅱ + 선택</small></span></label>
+                  <div class="choice-grid three compact-choices">
+                    <label class="choice"><input type="radio" name="math-elective" value="확률과 통계" checked>확률과 통계</label>
+                    <label class="choice"><input type="radio" name="math-elective" value="미적분">미적분</label>
+                    <label class="choice"><input type="radio" name="math-elective" value="기하">기하</label>
+                  </div>
+                </div>
+                <div class="csat-config-row simple-row">
+                  <label class="csat-include"><input id="includeEnglish" type="checkbox" checked><span><b>영어</b><small>70분 · 듣기 음원은 제공하지 않음</small></span></label>
+                  <em class="absolute-badge">절대평가</em>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel csat-config-panel">
+              <div class="panel-heading"><span class="badge red">추가 과목</span><h3>한국사 · 탐구 · 제2외국어/한문</h3></div>
+              <div class="csat-config-list">
+                <div class="csat-config-row simple-row">
+                  <label class="csat-include"><input id="includeHistory" type="checkbox" checked><span><b>한국사</b><small>30분 · 연습에서 선택 가능</small></span></label>
+                  <em class="absolute-badge">선택</em>
+                </div>
+                <div class="csat-config-row">
+                  <div class="csat-row-title"><span><b>탐구 영역</b><small>과목당 30분 · 최대 2과목</small></span><em id="inquirySelectedCount">2 / 2</em></div>
+                  <div id="inquiryChoiceGrid" class="inquiry-order-grid">
+                    <label><span>제1선택 <small>먼저 풀 탐구 과목</small></span><select id="inquiryFirstSelect" aria-label="탐구 제1선택"><option value="">선택 안 함</option></select></label>
+                    <label><span>제2선택 <small>다음에 풀 탐구 과목</small></span><select id="inquirySecondSelect" aria-label="탐구 제2선택"><option value="">선택 안 함</option></select></label>
+                  </div>
+                  <p class="inquiry-order-help">한 과목만 골라도 바로 해당 과목을 시작합니다. 두 과목이면 제1선택을 푼 뒤 10분 쉬고 제2선택을 풉니다.</p>
+                </div>
+                <div class="csat-config-row">
+                  <label class="csat-row-title" for="secondForeignSelect"><span><b>제2외국어/한문</b><small>40분 · 선택하지 않으면 건너뜀</small></span></label>
+                  <select id="secondForeignSelect" aria-label="제2외국어 또는 한문 선택">
+                    <option value="">응시 안 함</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel csat-schedule-panel">
+            <div class="panel-heading"><span class="badge indigo">연습 순서</span><h3>이번 선택 과목 세션</h3><strong id="csatSessionSummary">계산 중</strong></div>
+            <div id="csatSessionSchedule" class="csat-session-schedule" aria-live="polite"></div>
+            <p id="csatRoundNotice" class="csat-round-notice">가능하면 선택 과목을 같은 시험 회차로 맞추고, 공통 회차가 없을 때만 과목별 회차를 사용합니다.</p>
+          </div>
+
+          <div id="csatResumePanel" class="panel csat-resume-panel hidden" aria-live="polite">
+            <div><span class="eyebrow">진행 중인 연습</span><h3 id="csatResumeTitle">중단한 수능 연습 세션이 있습니다</h3><p id="csatResumeMeta">저장된 과목과 답안에서 계속할 수 있습니다.</p></div>
+            <div class="csat-resume-actions">
+              <button id="resumeCsatBtn" class="primary-btn">이어서 응시</button>
+              <button id="replaceCsatBtn" class="danger-btn">기존 종료 후 새 세션 시작</button>
+            </div>
+          </div>
+
+          <div class="csat-start-panel panel">
+            <div>
+              <span class="eyebrow">선택한 과목만 연속 진행</span>
+              <h3 id="csatTimerTitle">선택 과목 연습 준비 완료</h3>
+              <p id="csatStartHelp">고른 과목의 문제 PDF·답안·실제 제한시간과 과목 사이 10분 휴식을 하나의 세션으로 엽니다.</p>
+            </div>
+            <div class="timer-control">
+              <button id="startCsatBtn" class="primary-btn">선택 과목 연습 시작</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="targetModal" class="modal hidden">
+    <div class="modal-card target-modal-card">
+      <div class="modal-header"><h3>목표 대학·학과 직접 입력</h3><button class="modal-close" data-close-modal="targetModal" aria-label="목표 설정 닫기">×</button></div>
+      <p class="modal-help">대학교와 학과를 직접 입력하세요. 약칭·띄어쓰기·자주 쓰는 학과명을 분석해 앱에 있는 35개 대학과 48개 대표 전공 분야 중 관련 항목을 찾아 연결합니다.</p>
+      <div class="form-stack">
+        <div class="target-smart-search">
+          <div class="smart-search-field">
+            <label for="targetUniInput"><b>1. 대학교</b><span>직접 입력</span></label>
+            <input id="targetUniInput" type="text" autocomplete="off" spellcheck="false" placeholder="예: 숭실대학교, 숭실대, 서울대" aria-autocomplete="list" aria-controls="targetUniSuggestions" aria-expanded="false">
+            <div id="targetUniSuggestions" class="smart-suggestion-list hidden" role="listbox" aria-label="관련 대학교 검색 결과"></div>
+            <small>정식 명칭뿐 아니라 ‘서울대’, ‘외대’, ‘성대’ 같은 약칭도 찾습니다.</small>
+          </div>
+          <div class="search-flow-arrow" aria-hidden="true">↓</div>
+          <div class="smart-search-field">
+            <label for="targetMajorInput"><b>2. 학과</b><span>직접 입력</span></label>
+            <input id="targetMajorInput" type="text" autocomplete="off" spellcheck="false" placeholder="예: 컴퓨터공학과, 컴공, 경영학부" aria-autocomplete="list" aria-controls="targetMajorSuggestions" aria-expanded="false">
+            <div id="targetMajorSuggestions" class="smart-suggestion-list hidden" role="listbox" aria-label="관련 대표 전공 검색 결과"></div>
+            <small>실제 학과명을 가장 가까운 대표 전공 분야와 연결하며, 해당 대학의 개설 여부를 뜻하지 않습니다.</small>
+          </div>
+        </div>
+        <section id="targetMatchConfirmation" class="smart-match-confirmation" aria-live="polite">
+          <div class="smart-match-head"><span>입력 내용 연결 확인</span><em id="targetMatchStatus">입력 대기</em></div>
+          <div class="smart-match-row"><span>대학교</span><strong id="targetMatchedUni">직접 입력해 주세요</strong></div>
+          <div class="smart-match-row"><span>학과 → 대표 분야</span><strong id="targetMatchedMajor">직접 입력해 주세요</strong></div>
+          <p id="targetMatchHelp">정확히 일치하는 이름은 자동 연결하고, 비슷한 이름은 검색 결과를 눌러 확인합니다.</p>
+        </section>
+        <div id="targetCampusField" class="target-campus-field hidden">
+          <label for="targetCampusSelect">캠퍼스 <span>선택 사항</span></label>
+          <select id="targetCampusSelect"></select>
+          <small>캠퍼스를 고르지 않아도 대학 공통 학습목표로 추정합니다.</small>
+        </div>
+        <input id="targetGradeInput" type="hidden" value="2.0">
+        <section id="targetEstimateCard" class="ai-estimate-card" aria-live="polite">
+          <div class="ai-estimate-head"><span>입력 기반 자동 학습목표 추정</span><em id="targetEstimateConfidence">연결 대기</em></div>
+          <div class="ai-estimate-grade"><strong id="targetGradePreview">-</strong><span>등급</span><small id="targetGradeRange">예상 범위 -</small></div>
+          <p id="targetEstimateReason">대학교와 학과를 입력하고 연결 항목을 확인하면 추정 근거가 표시됩니다.</p>
+          <small id="targetOfferingNote">대표 전공 분야이며 선택한 대학의 실제 개설 학과명은 입학처에서 확인해야 합니다.</small>
+          <small>공식 합격선이 아닌 학습 목표용 추정치입니다. 대학별 환산점수·가산점·모집군과 최신 입시결과는 반드시 공식 자료로 확인하세요.</small>
+        </section>
+        <label>정시 참고 메모<textarea id="targetAdmissionMemo" placeholder="모집군, 반영영역, 가산점 등 직접 확인한 내용을 적어둘 수 있습니다."></textarea></label>
+      </div>
+      <div class="modal-actions"><button data-close-modal="targetModal" class="secondary-btn">취소</button><button id="saveTargetBtn" class="primary-btn" disabled>연결한 목표 저장</button></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/github-pages-config.js?v=20260821-github-pages-1"></script>
+  <script src="data/pdf-catalog.js?v=20260821-github-pages-1"></script>
+  <script src="data/universities.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/state.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/timer.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/dashboard.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/practice.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/csat.js?v=20260821-pdf-editor-grade-2"></script>
+  <script src="js/app.js?v=20260821-pdf-editor-grade-2"></script>
+</body>
+</html>

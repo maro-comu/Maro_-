@@ -1,0 +1,116 @@
+const parentOrigin = location.origin;
+let bridgedDocument = null;
+let bridgeStarted = false;
+let storageSignature = null;
+let storageMonitor = null;
+
+function notify(type, detail = {}, transfer = []) {
+  if (window.parent === window) return;
+  window.parent.postMessage({ type, ...detail }, parentOrigin, transfer);
+}
+
+function attachStorageBridge() {
+  const app = window.PDFViewerApplication;
+  const documentProxy = app?.pdfDocument;
+  if (!documentProxy) return;
+
+  const storage = documentProxy.annotationStorage;
+  if (!storage.onSetModified?.studyPdfBridge) {
+    const originalSetModified = storage.onSetModified;
+    const wrappedSetModified = (...args) => {
+      originalSetModified?.(...args);
+      notify("study-pdf-dirty", { annotationCount: storage.size || 0 });
+    };
+    wrappedSetModified.studyPdfBridge = true;
+    storage.onSetModified = wrappedSetModified;
+  }
+  if (documentProxy !== bridgedDocument) {
+    bridgedDocument = documentProxy;
+    storageSignature = `${storage.size || 0}:${storage.serializable?.hash || ""}`;
+    notify("study-pdf-ready", { pages: documentProxy.numPages || 0 });
+  }
+}
+
+function monitorStorage() {
+  const storage = window.PDFViewerApplication?.pdfDocument?.annotationStorage;
+  if (!storage) return;
+  try {
+    const nextSignature = `${storage.size || 0}:${storage.serializable?.hash || ""}`;
+    if (storageSignature !== null && nextSignature !== storageSignature) {
+      storageSignature = nextSignature;
+      notify("study-pdf-dirty", { annotationCount: storage.size || 0 });
+    }
+  } catch {
+    // 일부 이미지 주석이 직렬화되는 순간에는 다음 주기에 다시 확인합니다.
+  }
+}
+
+function editorToolActive() {
+  return Boolean(document.querySelector(
+    "#editorHighlightButton.toggled, #editorFreeTextButton.toggled, #editorInkButton.toggled, #editorStampButton.toggled, #editorSignatureButton.toggled"
+  ));
+}
+
+function notifyEditorInteraction(event) {
+  if (!editorToolActive()) return;
+  if (event.type === "pointerup" && event.target?.closest?.("#toolbarContainer")) return;
+  setTimeout(() => {
+    const storage = window.PDFViewerApplication?.pdfDocument?.annotationStorage;
+    notify("study-pdf-dirty", { annotationCount: storage?.size || 0 });
+  }, 80);
+}
+
+document.addEventListener("pointerup", notifyEditorInteraction, true);
+document.addEventListener("input", notifyEditorInteraction, true);
+document.addEventListener("change", notifyEditorInteraction, true);
+
+function startBridge() {
+  const app = window.PDFViewerApplication;
+  if (!app || bridgeStarted) return false;
+  bridgeStarted = true;
+  Promise.resolve(app.initializedPromise).then(() => {
+    app.eventBus.on("documentloaded", attachStorageBridge);
+    app.eventBus.on("pagesloaded", attachStorageBridge);
+    attachStorageBridge();
+    setTimeout(attachStorageBridge, 0);
+    setTimeout(attachStorageBridge, 250);
+    setTimeout(attachStorageBridge, 1000);
+    storageMonitor ||= setInterval(monitorStorage, 400);
+  });
+  return true;
+}
+
+document.addEventListener("webviewerloaded", startBridge, { once: true });
+if (!startBridge()) {
+  const poll = setInterval(() => {
+    if (startBridge()) clearInterval(poll);
+  }, 50);
+  setTimeout(() => clearInterval(poll), 15000);
+}
+
+window.addEventListener("message", async event => {
+  if (event.origin !== parentOrigin || event.source !== window.parent) return;
+  const message = event.data || {};
+  if (message.type !== "study-pdf-export") return;
+
+  const requestId = String(message.requestId || "");
+  try {
+    const app = window.PDFViewerApplication;
+    const documentProxy = app?.pdfDocument;
+    if (!documentProxy) throw new Error("PDF 문서가 아직 준비되지 않았습니다.");
+    app.pdfViewer?._layerProperties?.annotationEditorUIManager?.unselectAll?.();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const data = await documentProxy.saveDocument();
+    const buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    notify("study-pdf-exported", {
+      requestId,
+      annotationCount: documentProxy.annotationStorage.size || 0,
+      buffer,
+    }, [buffer]);
+  } catch (error) {
+    notify("study-pdf-export-error", {
+      requestId,
+      message: String(error?.message || error || "PDF 필기를 저장하지 못했습니다."),
+    });
+  }
+});
