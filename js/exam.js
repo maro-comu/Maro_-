@@ -109,7 +109,8 @@
   }
   function isStudyActive(){
     const sessionExamActive=!isCsatSession||sessionStages[sessionData?.currentStageIndex]?.type==="exam";
-    return mode==="start" && !submitted && !sessionInactive && sessionExamActive && document.visibilityState==="visible" && document.hasFocus();
+    const sessionWindowActive=document.visibilityState==="visible" && document.hasFocus();
+    return mode==="start" && !submitted && !sessionInactive && sessionExamActive && (!isCsatSession||sessionWindowActive);
   }
   function addElapsed(){
     if(activeStartedAt===null) return;
@@ -248,7 +249,7 @@
   function pdfViewerUrl(fileUrl){
     const viewer=new URL("vendor/pdfjs-viewer/web/viewer.html",location.href);
     viewer.searchParams.set("file",fileUrl);
-    viewer.searchParams.set("study","20260821-7");
+    viewer.searchParams.set("study","20260821-timer-drawing-2");
     viewer.hash="page=1&zoom=page-width";
     return viewer.href;
   }

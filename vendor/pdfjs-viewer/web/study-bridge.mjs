@@ -51,6 +51,27 @@ function editorToolActive() {
   ));
 }
 
+function drawingToolActive() {
+  return Boolean(document.querySelector(
+    "#editorHighlightButton.toggled, #editorInkButton.toggled"
+  ));
+}
+
+function clearSelectionAfterDrawing(event) {
+  if (event.type !== "pointerup" || !drawingToolActive()) return;
+  if (event.target?.closest?.("#toolbarContainer")) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.getSelection()?.removeAllRanges();
+    const manager=window.PDFViewerApplication?.pdfViewer?._layerProperties?.annotationEditorUIManager;
+    manager?.getActive?.()?.commitOrRemove?.();
+    while (manager?.hasSelection) {
+      const editor=manager.firstSelectedEditor;
+      if (!editor) break;
+      manager.unselect(editor);
+    }
+  }));
+}
+
 function notifyEditorInteraction(event) {
   if (!editorToolActive()) return;
   if (event.type === "pointerup" && event.target?.closest?.("#toolbarContainer")) return;
@@ -60,6 +81,7 @@ function notifyEditorInteraction(event) {
   }, 80);
 }
 
+document.addEventListener("pointerup", clearSelectionAfterDrawing, true);
 document.addEventListener("pointerup", notifyEditorInteraction, true);
 document.addEventListener("input", notifyEditorInteraction, true);
 document.addEventListener("change", notifyEditorInteraction, true);

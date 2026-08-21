@@ -1,0 +1,19 @@
+/* Keep pen/highlighter input in drawing mode instead of selecting PDF text. */
+.textLayer.highlighting,
+.textLayer.highlighting :is(span, br) {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  user-select: none !important;
+}
+
+.textLayer.highlighting :is(span, br) {
+  pointer-events: none !important;
+}
+
+/* Existing strokes do not capture new gestures while a drawing tool is active. */
+.annotationEditorLayer:is(.inkEditing, .highlightEditing)
+  > :is(.inkEditor, .highlightEditor),
+.annotationEditorLayer:is(.inkEditing, .highlightEditing)
+  > :is(.inkEditor, .highlightEditor) * {
+  pointer-events: none !important;
+}
