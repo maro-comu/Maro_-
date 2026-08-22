@@ -53,6 +53,22 @@
   function esc(value){
     return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
   }
+  function expandMathAliases(value){
+    let text=String(value??"");
+    const aliases=[
+      [/시그마|sigma|∑/gi,"Σ"],
+      [/제곱근|루트|sqrt/gi,"√"],
+      [/파이|pi/gi,"π"],
+      [/무한대|infinity/gi,"∞"],
+      [/곱하기|times/gi,"×"],
+      [/나누기|divide/gi,"÷"],
+      [/이상|greater\s*than\s*or\s*equal/gi,"≥"],
+      [/이하|less\s*than\s*or\s*equal/gi,"≤"],
+      [/같지\s*않음|not\s*equal/gi,"≠"]
+    ];
+    aliases.forEach(([pattern,symbol])=>{ text=text.replace(pattern,symbol); });
+    return text;
+  }
   function openPdfInLargePopup(event,popupName){
     const link=event.currentTarget;
     const url=String(link?.href||"");
@@ -78,7 +94,7 @@
   }
   function normalizeAnswer(value){
     const circled={"①":"1","②":"2","③":"3","④":"4","⑤":"5","❶":"1","❷":"2","❸":"3","❹":"4","❺":"5"};
-    let normalized=String(value??"").normalize("NFKC").trim().replace(/[①②③④⑤❶❷❸❹❺]/g,c=>circled[c]).replace(/[\s,]/g,"");
+    let normalized=expandMathAliases(String(value??"").normalize("NFKC")).trim().replace(/[①②③④⑤❶❷❸❹❺]/g,c=>circled[c]).replace(/[\s,]/g,"");
     if(/^-?\d+$/.test(normalized)) normalized=String(Number(normalized));
     return normalized;
   }
@@ -989,6 +1005,25 @@
   }
 
   function currentKey(){ return answerKey[currentQuestionIndex]||answerKey[0]||null; }
+  function insertMathSymbol(input,symbol){
+    if(!input||input.disabled) return;
+    const start=Number.isInteger(input.selectionStart)?input.selectionStart:input.value.length;
+    const end=Number.isInteger(input.selectionEnd)?input.selectionEnd:start;
+    input.value=`${input.value.slice(0,start)}${symbol}${input.value.slice(end)}`;
+    const cursor=start+symbol.length;
+    input.focus();
+    input.setSelectionRange?.(cursor,cursor);
+    input.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  function replaceMathAliasesInInput(input){
+    if(!input) return false;
+    const next=expandMathAliases(input.value);
+    if(next===input.value) return false;
+    input.value=next;
+    const cursor=next.length;
+    input.setSelectionRange?.(cursor,cursor);
+    return true;
+  }
   function renderCurrentAnswer(){
     const item=currentKey();
     if(!item){ el("answerSheet").innerHTML=""; return; }
@@ -1002,12 +1037,13 @@
     const resultClass=unverified?" ungraded":isCorrect===null?"":isCorrect?" correct":" wrong";
     const control=objective
       ?`<select id="answer-${number}" data-answer-number="${number}" aria-label="${number}번 답" ${disabled?"disabled":""}><option value="">선택</option>${[1,2,3,4,5].map(choice=>`<option value="${choice}" ${value===String(choice)?"selected":""}>${choice}번</option>`).join("")}</select>`
-      :`<input id="answer-${number}" data-answer-number="${number}" type="text" inputmode="numeric" maxlength="12" value="${esc(value)}" placeholder="숫자로 입력" aria-label="${number}번 답" ${disabled?"disabled":""}>`;
+      :`<div class="short-answer-control"><input id="answer-${number}" data-answer-number="${number}" type="text" inputmode="text" maxlength="80" value="${esc(value)}" placeholder="숫자 또는 수식 입력" aria-label="${number}번 답" aria-describedby="math-input-help-${number}" autocomplete="off" autocapitalize="off" spellcheck="false" ${disabled?"disabled":""}><div class="math-symbol-pad" role="group" aria-label="수식 기호 입력">${[["Σ","시그마"],["√","루트"],["π","파이"],["×","곱하기"],["÷","나누기"],["^","제곱"],["(","여는 괄호"],[")","닫는 괄호"],["=","같음"],["∞","무한대"],["≤","작거나 같음"],["≥","크거나 같음"],["≠","같지 않음"]].map(([symbol,label])=>`<button type="button" class="math-symbol-btn" data-math-symbol="${esc(symbol)}" aria-label="${esc(label)} ${esc(symbol)}" title="${esc(label)}" ${disabled?"disabled":""}>${esc(symbol)}</button>`).join("")}</div><p id="math-input-help-${number}" class="math-input-help">한글로 입력해도 됩니다: 시그마 → Σ · 루트 → √ · 파이 → π</p></div>`;
     el("currentAnswerTitle").textContent=`${number}번 답안`;
     const statusText=unverified?`<p class="answer-result-text ungraded">정답키 미검증 · 자동채점 제외 · 답안은 저장됩니다</p>`:displayedResult?`<p class="answer-result-text">${isCorrect?"정답입니다":`${mine?`내 답 ${esc(mine)}`:"미응답"} · 정답 ${esc(item.correct)}`}</p>`:"";
     el("answerSheet").innerHTML=`<div class="answer-cell current-answer-cell${resultClass}" data-answer-cell="${number}"><label for="answer-${number}">${number}</label>${control}${statusText}</div>`;
     const answerControl=el("answerSheet").querySelector("[data-answer-number]");
     if(answerControl){
+      let composing=false;
       const save=()=>{
         draftAnswers[number]=normalizeAnswer(answerControl.value);
         if(draftAnswers[number]) skippedQuestions.delete(Number(number));
@@ -1015,10 +1051,18 @@
         updateJumpOptions();
         if(isCsatSession) saveSessionDraft(); else savePracticeDraft();
       };
-      answerControl.addEventListener("input",save);
-      answerControl.addEventListener("change",save);
+      const saveWithMathAliases=()=>{ replaceMathAliasesInInput(answerControl);save(); };
+      answerControl.addEventListener("input",()=>{ if(!composing) saveWithMathAliases(); });
+      answerControl.addEventListener("change",saveWithMathAliases);
+      answerControl.addEventListener("compositionstart",()=>{ composing=true; });
+      answerControl.addEventListener("compositionend",()=>{ composing=false;saveWithMathAliases(); });
+      answerControl.addEventListener("blur",saveWithMathAliases);
       answerControl.addEventListener("keydown",event=>{
         if(event.key==="Enter" && currentQuestionIndex<answerKey.length-1){ event.preventDefault(); goToQuestion(currentQuestionIndex+1,{focusAnswer:true}); }
+      });
+      el("answerSheet").querySelectorAll("[data-math-symbol]").forEach(button=>{
+        button.addEventListener("pointerdown",event=>event.preventDefault());
+        button.addEventListener("click",()=>insertMathSymbol(answerControl,button.dataset.mathSymbol||""));
       });
     }
   }
