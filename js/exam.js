@@ -1073,7 +1073,7 @@
     const next=Math.max(0,Math.min(answerKey.length-1,Number(index)||0));
     if(next===currentQuestionIndex && !options.force) return;
     currentQuestionIndex=next;
-    pendingSubmittedQuestionIndex=null;
+    if(!options.keepSubmittedSelection) pendingSubmittedQuestionIndex=null;
     renderCurrentQuestion();
     if(isCsatSession) saveSessionDraft(); else savePracticeDraft();
     if(options.focusAnswer) setTimeout(()=>el("answerSheet").querySelector("[data-answer-number]")?.focus(),0);
@@ -1253,7 +1253,7 @@
     el("goToProblemBtn").addEventListener("click",()=>{
       const index=selectedSubmittedQuestionIndex();
       if(index===null) return;
-      goToQuestion(index,{force:true});
+      goToQuestion(index,{force:true,keepSubmittedSelection:true});
       el("pdfDocumentViewport")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
     el("answerPreviousBtn").addEventListener("click",()=>goToQuestion(currentQuestionIndex-1,{focusAnswer:true}));
