@@ -112,12 +112,6 @@ button { touch-action: manipulation; }
 .answer-cell label { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 10px; background: #172b45; color: #e2eaf4; font-size: 16px; font-weight: 950; }
 .answer-cell select, .answer-cell input { width: 100%; min-width: 0; height: 46px; padding: 6px 9px; border: 1px solid #395b80; border-radius: 9px; outline: 0; background: #081521; color: #fff; font-size: 17px; font-weight: 800; text-align: center; }
 .answer-cell select:focus, .answer-cell input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124, 131, 255, .13); }
-.short-answer-control { display: grid; min-width: 0; gap: 7px; }
-.math-symbol-pad { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.math-symbol-btn { min-width: 0; min-height: 29px; padding: 3px 2px; border: 1px solid #34506e; border-radius: 7px; background: #13263d; color: #e4ebff; font: inherit; font-size: 13px; font-weight: 900; cursor: pointer; }
-.math-symbol-btn:hover, .math-symbol-btn:focus-visible { border-color: #7580ff; background: rgba(124, 131, 255, .17); color: #fff; }
-.math-symbol-btn:disabled { opacity: .45; cursor: default; }
-.math-input-help { margin: 0; color: #91a9c4; font-size: 8px; font-weight: 700; line-height: 1.45; text-align: left; }
 .answer-cell.correct { border-color: rgba(69, 209, 154, .65); background: rgba(69, 209, 154, .08); }
 .answer-cell.wrong { border-color: rgba(255, 107, 121, .72); background: rgba(255, 107, 121, .09); }
 .answer-cell.ungraded { border-color: rgba(246, 200, 95, .55); background: rgba(246, 200, 95, .07); }
@@ -147,6 +141,12 @@ button { touch-action: manipulation; }
 .wrong-chip b { color: #fff; }
 
 .answer-pdf-section { width: min(1500px, calc(100% - 24px)); margin: 0 auto 14px; border-color: rgba(255, 107, 121, .35); }
+.answer-pdf-question-jump { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
+.answer-pdf-question-jump > span { flex: 0 0 auto; padding-top: 7px; color: #aebed0; font-size: 10px; font-weight: 900; }
+.answer-pdf-question-nav { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; }
+.answer-pdf-question-nav button { min-width: 36px; height: 30px; padding: 0 7px; border: 1px solid #34506e; border-radius: 7px; background: #102138; color: #c8daec; font: inherit; font-size: 10px; font-weight: 900; cursor: pointer; }
+.answer-pdf-question-nav button:hover, .answer-pdf-question-nav button:focus-visible { border-color: #7580ff; color: #fff; }
+.answer-pdf-question-nav button[aria-current="page"] { border-color: #7c83ff; background: rgba(124, 131, 255, .2); color: #fff; }
 .pdf-frame-wrap { position: relative; min-height: 680px; background: #fff; }
 .pdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
 .answer-frame-wrap { height: min(82vh, 1000px); }
