@@ -23,6 +23,12 @@
   let problemQuestionLocationsGeneration=-1;
   let problemQuestionLocationsTask=null;
   let problemNavigationInProgress=false;
+  let answerQuestionLocations=new Map();
+  let answerQuestionLocationsSource="";
+  let answerQuestionLocationsResolved=false;
+  let answerQuestionLocationsTask=null;
+  let answerQuestionLocationsTaskSource="";
+  let answerNavigationInProgress=false;
   let draftAnswers={};
   let displayedResult=null;
   let pdfViewerGeneration=0;
@@ -307,13 +313,29 @@
   }
   function questionNumberAt(items,index,wantedNumbers){
     const marker=normalizedQuestionMarker(items[index]?.str);
-    const direct=marker.match(/^(\d+)[.)]$/);
+    const direct=marker.match(/^(\d+)[.)](?:$|(?=[\[\(가-힣]))/);
     if(direct&&wantedNumbers.has(direct[1])) return direct[1];
     if(!/^\d+$/.test(marker)||!wantedNumbers.has(marker)) return "";
     for(let next=index+1;next<items.length;next+=1){
       const following=normalizedQuestionMarker(items[next]?.str);
       if(!following) continue;
       return following==="."||following===")"?marker:"";
+    }
+    return "";
+  }
+  function answerQuestionNumberAt(items,index,wantedNumbers){
+    const marker=normalizedQuestionMarker(items[index]?.str);
+    const direct=marker.match(/^(\d+)[.)](?!\d)/);
+    if(!direct||!wantedNumbers.has(direct[1])) return "";
+    if(marker.includes("출제의도")) return direct[1];
+    const y=Number(items[index]?.transform?.[5]);
+    for(let next=index+1;next<items.length;next+=1){
+      const following=items[next];
+      const followingMarker=normalizedQuestionMarker(following?.str);
+      if(!followingMarker) continue;
+      const followingY=Number(following?.transform?.[5]);
+      if(Number.isFinite(y)&&Number.isFinite(followingY)&&Math.abs(followingY-y)>2) break;
+      if(followingMarker.includes("출제의도")) return direct[1];
     }
     return "";
   }
@@ -366,6 +388,94 @@
       viewer.scrollPageIntoView(options);
     }else viewer.currentPageNumber=location.pageNumber;
     return true;
+  }
+  function resetAnswerQuestionLocations(){
+    answerQuestionLocations=new Map();
+    answerQuestionLocationsSource="";
+    answerQuestionLocationsResolved=false;
+    answerQuestionLocationsTask=null;
+    answerQuestionLocationsTaskSource="";
+    answerNavigationInProgress=false;
+  }
+  function answerPdfSource(){
+    return String(el("answerPdfFrame")?.getAttribute("src")||"");
+  }
+  function waitForAnswerPdfViewer(timeout=12000){
+    const frame=el("answerPdfFrame");
+    const source=answerPdfSource();
+    if(!frame||!source||source==="about:blank") return Promise.reject(new Error("정답 PDF가 없습니다."));
+    return new Promise((resolve,reject)=>{
+      const deadline=Date.now()+timeout;
+      const probe=()=>{
+        if(el("answerPdfFrame")!==frame||answerPdfSource()!==source){reject(new Error("정답 PDF가 변경되었습니다."));return;}
+        try{
+          const app=frame.contentWindow?.PDFViewerApplication;
+          if(app?.pdfDocument&&app?.pdfViewer){resolve({app,source});return;}
+        }catch(error){ /* 정답 PDF 편집기 준비를 계속 확인합니다. */ }
+        if(Date.now()>=deadline){reject(new Error("정답 PDF가 아직 준비되지 않았습니다."));return;}
+        setTimeout(probe,120);
+      };
+      probe();
+    });
+  }
+  async function getAnswerQuestionLocations(documentProxy,source){
+    if(answerQuestionLocationsResolved&&answerQuestionLocationsSource===source) return answerQuestionLocations;
+    if(answerQuestionLocationsTask&&answerQuestionLocationsTaskSource===source) return answerQuestionLocationsTask;
+    const wantedNumbers=new Set(answerKey.map(item=>String(item.number)));
+    const task=(async()=>{
+      const detailedFound=new Map();
+      const fallbackFound=new Map();
+      for(let pageNumber=1;pageNumber<=documentProxy.numPages;pageNumber+=1){
+        if(answerPdfSource()!==source) throw new Error("정답 PDF가 변경되었습니다.");
+        const page=await documentProxy.getPage(pageNumber);
+        const textContent=await page.getTextContent();
+        const items=Array.isArray(textContent?.items)?textContent.items:[];
+        for(let index=0;index<items.length;index+=1){
+          const transform=items[index]?.transform||[];
+          const x=Number(transform[4]);
+          const y=Number(transform[5]);
+          const location={pageNumber,x:Number.isFinite(x)?x:null,y:Number.isFinite(y)?y:null};
+          const detailedNumber=answerQuestionNumberAt(items,index,wantedNumbers);
+          if(detailedNumber&&!detailedFound.has(detailedNumber)) detailedFound.set(detailedNumber,location);
+          const fallbackNumber=questionNumberAt(items,index,wantedNumbers);
+          if(fallbackNumber&&!fallbackFound.has(fallbackNumber)) fallbackFound.set(fallbackNumber,location);
+        }
+      }
+      const found=detailedFound.size?detailedFound:fallbackFound;
+      if(answerPdfSource()===source){
+        answerQuestionLocations=found;
+        answerQuestionLocationsSource=source;
+        answerQuestionLocationsResolved=true;
+      }
+      return found;
+    })();
+    answerQuestionLocationsTask=task;
+    answerQuestionLocationsTaskSource=source;
+    try{return await task;}
+    finally{
+      if(answerQuestionLocationsTaskSource===source){
+        answerQuestionLocationsTask=null;
+        answerQuestionLocationsTaskSource="";
+      }
+    }
+  }
+  function movePdfViewerToLocation(viewer,location){
+    if(!viewer||!location) return false;
+    if(typeof viewer.scrollPageIntoView==="function"){
+      const options={pageNumber:location.pageNumber};
+      if(Number.isFinite(location.x)&&Number.isFinite(location.y)) options.destArray=[null,{name:"XYZ"},location.x,location.y,null];
+      viewer.scrollPageIntoView(options);
+    }else viewer.currentPageNumber=location.pageNumber;
+    return true;
+  }
+  async function moveAnswerPdfToQuestion(index){
+    const item=answerKey[index];
+    if(!item) return false;
+    const {app,source}=await waitForAnswerPdfViewer();
+    const location=(await getAnswerQuestionLocations(app.pdfDocument,source)).get(String(item.number));
+    if(location) return movePdfViewerToLocation(app.pdfViewer,location);
+    const fallbackPage=Math.max(1,Math.round(Number(paper?.answerStartPage)||1));
+    return movePdfViewerToLocation(app.pdfViewer,{pageNumber:fallbackPage,x:null,y:null});
   }
   function savePracticeDraft(){
     if(mode!=="start"||isCsatSession||!paper) return;
@@ -1020,6 +1130,7 @@
   function renderPaper(savedResult=null,initialAnswers=null,preferredQuestionIndex=0){
     const review=!!savedResult;
     const compactSession=isActiveSessionExamView();
+    resetAnswerQuestionLocations();
     el("submittedNavigation").classList.add("hidden");
     document.body.classList.toggle("solving",!review&&!submitted);
     el("examModeBadge").textContent=review?"저장된 PDF·필기 다시보기":compactSession?"수능 모의 · 시험 진행 중":context==="csat"?"수능 구성 랜덤 기출":"과목별 랜덤 기출";
@@ -1077,7 +1188,10 @@
       problemButton.disabled=selectedIndex===null||problemNavigationInProgress;
       problemButton.textContent=problemNavigationInProgress?"이동 중…":"문제 이동";
     }
-    if(answerButton) answerButton.disabled=selectedIndex===null;
+    if(answerButton){
+      answerButton.disabled=selectedIndex===null||answerNavigationInProgress;
+      answerButton.textContent=answerNavigationInProgress?"이동 중…":"정답 이동";
+    }
     nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" class="${index===currentQuestionIndex?"is-current":""}" data-submitted-question="${index}" aria-label="${number}번 문제 선택" aria-pressed="${index===selectedIndex}">${number}번</button>`).join("");
     nav.querySelectorAll("[data-submitted-question]").forEach(button=>button.addEventListener("click",()=>{
       pendingSubmittedQuestionIndex=Number(button.dataset.submittedQuestion);
@@ -1242,6 +1356,7 @@
     const answerUrl=paperUrl("answer");
     el("submittedNavigation").classList.remove("hidden");
     if(answerUrl){
+      resetAnswerQuestionLocations();
       el("answerPdfFrame").src=pdfViewerUrl(answerUrl,paper.answerStartPage);
       el("answerPdfSection").classList.remove("hidden");
       if(options.scroll!==false) setTimeout(()=>el("submittedNavigation").scrollIntoView({behavior:"smooth",block:"start"}),180);
@@ -1321,12 +1436,18 @@
     el("openProblemPdfBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppProblemPdf"));
     el("openAnswerPdfBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppAnswerPdf"));
     el("openSessionAnswerBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppSessionAnswerPdf"));
-    el("goToAnswerPdfBtn").addEventListener("click",()=>{
+    el("goToAnswerPdfBtn").addEventListener("click",async()=>{
       const index=selectedSubmittedQuestionIndex();
-      if(index===null) return;
+      if(index===null||answerNavigationInProgress) return;
+      answerNavigationInProgress=true;
       goToQuestion(index,{force:true,keepSubmittedSelection:true});
-      el("answerCard")?.scrollIntoView({behavior:"smooth",block:"start"});
-      setTimeout(()=>el("answerSheet")?.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
+      el("answerPdfSection")?.scrollIntoView({behavior:"smooth",block:"start"});
+      try{ await moveAnswerPdfToQuestion(index); }
+      catch(error){
+        console.warn("선택한 문항의 정답 PDF 위치로 이동하지 못했습니다.",error);
+        el("answerCard")?.scrollIntoView({behavior:"smooth",block:"start"});
+        setTimeout(()=>el("answerSheet")?.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
+      }finally{answerNavigationInProgress=false;renderSubmittedQuestionNav();}
     });
     el("goToProblemBtn").addEventListener("click",async()=>{
       const index=selectedSubmittedQuestionIndex();
