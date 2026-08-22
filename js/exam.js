@@ -327,15 +327,18 @@
     const marker=normalizedQuestionMarker(items[index]?.str);
     const direct=marker.match(/^(\d+)[.)](?!\d)/);
     if(!direct||!wantedNumbers.has(direct[1])) return "";
-    if(marker.includes("출제의도")) return direct[1];
+    const intentPattern=new RegExp(`^${direct[1]}[.)](?:\\[)?출제의도`);
+    let line=marker;
+    if(intentPattern.test(line)) return direct[1];
     const y=Number(items[index]?.transform?.[5]);
     for(let next=index+1;next<items.length;next+=1){
       const following=items[next];
       const followingMarker=normalizedQuestionMarker(following?.str);
       if(!followingMarker) continue;
       const followingY=Number(following?.transform?.[5]);
-      if(Number.isFinite(y)&&Number.isFinite(followingY)&&Math.abs(followingY-y)>2) break;
-      if(followingMarker.includes("출제의도")) return direct[1];
+      if(Number.isFinite(y)&&Number.isFinite(followingY)&&Math.abs(followingY-y)>3) break;
+      line+=followingMarker;
+      if(intentPattern.test(line)) return direct[1];
     }
     return "";
   }
