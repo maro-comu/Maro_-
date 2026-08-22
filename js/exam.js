@@ -18,6 +18,7 @@
   let activeStartedAt=null;
   let tickHandle=null;
   let currentQuestionIndex=0;
+  let pendingSubmittedQuestionIndex=null;
   let draftAnswers={};
   let displayedResult=null;
   let pdfViewerGeneration=0;
@@ -609,7 +610,7 @@
     persistSession();
   }
   function resetSessionPaperUi(){
-    displayedResult=null;submitted=false;destroyPdfView();
+    displayedResult=null;submitted=false;pendingSubmittedQuestionIndex=null;destroyPdfView();
     el("gradeSummary").classList.add("hidden");el("wrongAnswerGuide").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("submittedNavigation").classList.add("hidden");
     el("sessionBreakState").classList.add("hidden");el("sessionCompleteState").classList.add("hidden");
     el("finishExamBtn").classList.remove("hidden");el("closeReviewBtn").classList.add("hidden");
@@ -985,19 +986,26 @@
       const found=answerKey.findIndex(item=>item.number===firstWrong);
       if(found>=0) currentQuestionIndex=found;
     }
+    pendingSubmittedQuestionIndex=null;
     el("questionJumpSelect").innerHTML=answerKey.map(({number},index)=>`<option value="${index}">${number}번${draftAnswers[number]?" · 입력됨":skippedQuestions.has(Number(number))?" · 스킵":""}</option>`).join("");
     renderCurrentQuestion();
     updateProgress();
   }
 
   function currentKey(){ return answerKey[currentQuestionIndex]||answerKey[0]||null; }
+  function selectedSubmittedQuestionIndex(){
+    if(!Number.isInteger(pendingSubmittedQuestionIndex)) return null;
+    return pendingSubmittedQuestionIndex>=0&&pendingSubmittedQuestionIndex<answerKey.length?pendingSubmittedQuestionIndex:null;
+  }
   function renderSubmittedQuestionNav(){
     const nav=el("submittedQuestionNav");
     if(!nav) return;
-    nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" data-submitted-question="${index}" aria-label="${number}번 문제로 이동" ${index===currentQuestionIndex?'aria-current="page"':''}>${number}번</button>`).join("");
+    const selectedIndex=selectedSubmittedQuestionIndex();
+    el("goToProblemBtn").disabled=selectedIndex===null;
+    nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" class="${index===currentQuestionIndex?"is-current":""}" data-submitted-question="${index}" aria-label="${number}번 문제 선택" aria-pressed="${index===selectedIndex}">${number}번</button>`).join("");
     nav.querySelectorAll("[data-submitted-question]").forEach(button=>button.addEventListener("click",()=>{
-      goToQuestion(Number(button.dataset.submittedQuestion),{force:true});
-      el("pdfDocumentViewport")?.scrollIntoView({behavior:"smooth",block:"start"});
+      pendingSubmittedQuestionIndex=Number(button.dataset.submittedQuestion);
+      renderSubmittedQuestionNav();
     }));
   }
   function renderCurrentAnswer(){
@@ -1065,6 +1073,7 @@
     const next=Math.max(0,Math.min(answerKey.length-1,Number(index)||0));
     if(next===currentQuestionIndex && !options.force) return;
     currentQuestionIndex=next;
+    pendingSubmittedQuestionIndex=null;
     renderCurrentQuestion();
     if(isCsatSession) saveSessionDraft(); else savePracticeDraft();
     if(options.focusAnswer) setTimeout(()=>el("answerSheet").querySelector("[data-answer-number]")?.focus(),0);
@@ -1240,6 +1249,12 @@
     el("goToAnswerPdfBtn").addEventListener("click",()=>{
       const section=el("answerPdfSection");
       if(!section.classList.contains("hidden")) section.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+    el("goToProblemBtn").addEventListener("click",()=>{
+      const index=selectedSubmittedQuestionIndex();
+      if(index===null) return;
+      goToQuestion(index,{force:true});
+      el("pdfDocumentViewport")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
     el("answerPreviousBtn").addEventListener("click",()=>goToQuestion(currentQuestionIndex-1,{focusAnswer:true}));
     el("answerNextBtn").addEventListener("click",()=>{
