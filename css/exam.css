@@ -33,6 +33,16 @@ button { touch-action: manipulation; }
 .config-summary { width: min(1500px, calc(100% - 24px)); margin: 10px auto 0; padding: 9px 13px; border: 1px solid #263e5b; border-radius: 11px; background: #0b1929; color: #9fb4cc; font-size: 11px; line-height: 1.6; }
 .config-summary b { color: #dce7f4; }
 .config-summary .summary-dot { display: inline-block; width: 4px; height: 4px; margin: 0 7px; border-radius: 50%; background: #6d78ef; vertical-align: middle; }
+.submitted-navigation { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .36fr); gap: 8px; width: min(1500px, calc(100% - 24px)); margin: 10px auto 0; padding: 8px; border: 1px solid #365172; border-radius: 12px; background: rgba(8, 21, 33, .97); box-shadow: 0 12px 32px rgba(0, 0, 0, .25); backdrop-filter: blur(12px); }
+.submitted-navigation-pane { display: grid; gap: 7px; min-width: 0; padding: 9px 10px; border: 1px solid #27415e; border-radius: 9px; background: rgba(17, 36, 57, .78); }
+.submitted-navigation-pane .section-kicker { color: #c4c8ff; }
+.submitted-question-nav { display: flex; flex-wrap: wrap; gap: 5px; }
+.submitted-question-nav button { min-width: 36px; height: 30px; padding: 0 7px; border: 1px solid #34506e; border-radius: 7px; background: #102138; color: #c8daec; font: inherit; font-size: 10px; font-weight: 900; cursor: pointer; }
+.submitted-question-nav button:hover, .submitted-question-nav button:focus-visible { border-color: #7580ff; color: #fff; }
+.submitted-question-nav button[aria-current="page"] { border-color: #7c83ff; background: rgba(124, 131, 255, .2); color: #fff; }
+.submitted-answer-navigation-pane { align-content: start; }
+.submitted-answer-nav-btn { width: 100%; min-height: 36px; }
+.submitted-answer-nav-btn:disabled { opacity: .45; cursor: default; }
 .loading-state, .error-state { width: min(560px, calc(100% - 32px)); margin: auto; padding: 54px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); text-align: center; }
 .loading-state b, .error-state b { display: block; margin-top: 14px; }
 .loading-state p, .error-state p { color: var(--muted); font-size: 11px; line-height: 1.7; }
@@ -141,12 +151,6 @@ button { touch-action: manipulation; }
 .wrong-chip b { color: #fff; }
 
 .answer-pdf-section { width: min(1500px, calc(100% - 24px)); margin: 0 auto 14px; border-color: rgba(255, 107, 121, .35); }
-.answer-pdf-question-jump { display: flex; align-items: flex-start; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .025); }
-.answer-pdf-question-jump > span { flex: 0 0 auto; padding-top: 7px; color: #aebed0; font-size: 10px; font-weight: 900; }
-.answer-pdf-question-nav { display: flex; flex: 1; flex-wrap: wrap; gap: 5px; }
-.answer-pdf-question-nav button { min-width: 36px; height: 30px; padding: 0 7px; border: 1px solid #34506e; border-radius: 7px; background: #102138; color: #c8daec; font: inherit; font-size: 10px; font-weight: 900; cursor: pointer; }
-.answer-pdf-question-nav button:hover, .answer-pdf-question-nav button:focus-visible { border-color: #7580ff; color: #fff; }
-.answer-pdf-question-nav button[aria-current="page"] { border-color: #7c83ff; background: rgba(124, 131, 255, .2); color: #fff; }
 .pdf-frame-wrap { position: relative; min-height: 680px; background: #fff; }
 .pdf-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
 .answer-frame-wrap { height: min(82vh, 1000px); }
@@ -214,6 +218,7 @@ button { touch-action: manipulation; }
   .exam-topbar { position: static; align-items: flex-start; flex-direction: column; padding: 12px; }
   .exam-time-box { width: 100%; text-align: left; }
   .paper-workspace, .config-summary, .answer-pdf-section, .session-schedule-bar, .session-complete-state { width: calc(100% - 12px); }
+  .submitted-navigation { position: static; grid-template-columns: minmax(0, 1fr); width: calc(100% - 12px); }
   .paper-workspace, .paper-workspace:has(.answer-card.collapsed) { height: auto; overflow: visible; grid-template-columns: minmax(0, 1fr); }
   .pdf-card { height: 72dvh; min-height: 620px; grid-column: 1; grid-row: 2; }
   .card-heading { align-items: flex-start; flex-direction: column; }

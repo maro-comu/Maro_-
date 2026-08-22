@@ -610,7 +610,7 @@
   }
   function resetSessionPaperUi(){
     displayedResult=null;submitted=false;destroyPdfView();
-    el("gradeSummary").classList.add("hidden");el("wrongAnswerGuide").classList.add("hidden");el("answerPdfSection").classList.add("hidden");
+    el("gradeSummary").classList.add("hidden");el("wrongAnswerGuide").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("submittedNavigation").classList.add("hidden");
     el("sessionBreakState").classList.add("hidden");el("sessionCompleteState").classList.add("hidden");
     el("finishExamBtn").classList.remove("hidden");el("closeReviewBtn").classList.add("hidden");
     el("finishExamBtn").textContent="영역 답안 제출·잠금";
@@ -639,7 +639,7 @@
   }
   function renderSessionPauseStage(stage){
     addElapsed();submitted=true;activeStartedAt=null;destroyPdfView();document.body.classList.remove("solving");
-    el("loadingState").classList.add("hidden");el("examWorkspace").classList.add("hidden");el("examFooter").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("sessionCompleteState").classList.add("hidden");el("configSummary").classList.add("hidden");
+    el("loadingState").classList.add("hidden");el("examWorkspace").classList.add("hidden");el("examFooter").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("submittedNavigation").classList.add("hidden");el("sessionCompleteState").classList.add("hidden");el("configSummary").classList.add("hidden");
     el("sessionBreakState").classList.remove("hidden");
     const names={break:"중간 휴식"};
     el("examModeBadge").textContent="수능 모의 전체 세션";
@@ -841,7 +841,7 @@
     sessionReviewRecords=records;sessionReviewOptions=options;
     addElapsed();clearInterval(tickHandle);submitted=true;destroyPdfView();document.body.classList.remove("solving");
     pendingConfirmAction="";el("confirmLayer").classList.add("hidden");
-    el("loadingState").classList.add("hidden");el("examWorkspace").classList.add("hidden");el("examFooter").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("sessionBreakState").classList.add("hidden");el("configSummary").classList.add("hidden");el("sessionAnswerReview").classList.add("hidden");el("sessionCompleteState").classList.remove("hidden");
+    el("loadingState").classList.add("hidden");el("examWorkspace").classList.add("hidden");el("examFooter").classList.add("hidden");el("answerPdfSection").classList.add("hidden");el("submittedNavigation").classList.add("hidden");el("sessionBreakState").classList.add("hidden");el("configSummary").classList.add("hidden");el("sessionAnswerReview").classList.add("hidden");el("sessionCompleteState").classList.remove("hidden");
     const graded=records.reduce((sum,item)=>sum+Number(item.result?.gradedCount||0),0),correct=records.reduce((sum,item)=>sum+Number(item.result?.correctCount||0),0),presented=records.reduce((sum,item)=>sum+Number(item.result?.presentedTotal||0),0),wrong=records.reduce((sum,item)=>sum+Number(item.result?.wrong?.length||0),0);
     const score=graded?Math.round(correct/graded*100):null;
     const overallGrade=estimateGrade(score,graded,presented);
@@ -931,6 +931,7 @@
     el("sessionCompleteState").classList.add("hidden");
     el("sessionScheduleBar").classList.add("hidden");
     el("answerPdfSection").classList.add("hidden");
+    el("submittedNavigation").classList.add("hidden");
     el("examErrorMessage").textContent=message;
     el("examError").classList.remove("hidden");
   }
@@ -948,6 +949,7 @@
   function renderPaper(savedResult=null,initialAnswers=null,preferredQuestionIndex=0){
     const review=!!savedResult;
     const compactSession=isActiveSessionExamView();
+    el("submittedNavigation").classList.add("hidden");
     document.body.classList.toggle("solving",!review&&!submitted);
     el("examModeBadge").textContent=review?"저장된 PDF·필기 다시보기":compactSession?"수능 모의 · 시험 진행 중":context==="csat"?"수능 구성 랜덤 기출":"과목별 랜덤 기출";
     el("examTitle").textContent=compactSession?sessionPeriodLabel():paper.title||`${paper.subject||""} 기출문제`;
@@ -989,12 +991,13 @@
   }
 
   function currentKey(){ return answerKey[currentQuestionIndex]||answerKey[0]||null; }
-  function renderAnswerPdfQuestionNav(){
-    const nav=el("answerPdfQuestionNav");
+  function renderSubmittedQuestionNav(){
+    const nav=el("submittedQuestionNav");
     if(!nav) return;
-    nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" data-answer-pdf-question="${index}" aria-label="${number}번 문제로 이동" ${index===currentQuestionIndex?'aria-current="page"':''}>${number}번</button>`).join("");
-    nav.querySelectorAll("[data-answer-pdf-question]").forEach(button=>button.addEventListener("click",()=>{
-      goToQuestion(Number(button.dataset.answerPdfQuestion),{scrollProblem:true,force:true});
+    nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" data-submitted-question="${index}" aria-label="${number}번 문제로 이동" ${index===currentQuestionIndex?'aria-current="page"':''}>${number}번</button>`).join("");
+    nav.querySelectorAll("[data-submitted-question]").forEach(button=>button.addEventListener("click",()=>{
+      goToQuestion(Number(button.dataset.submittedQuestion),{force:true});
+      el("pdfDocumentViewport")?.scrollIntoView({behavior:"smooth",block:"start"});
     }));
   }
   function renderCurrentAnswer(){
@@ -1056,7 +1059,7 @@
     el("skipQuestionBtn").disabled=submitted||mode==="review";
     el("skipQuestionBtn").textContent=skippedQuestions.has(Number(item.number))?"스킵 해제":"문제 스킵";
     renderCurrentAnswer();
-    renderAnswerPdfQuestionNav();
+    renderSubmittedQuestionNav();
   }
   function goToQuestion(index,options={}){
     const next=Math.max(0,Math.min(answerKey.length-1,Number(index)||0));
@@ -1152,10 +1155,12 @@
       el("wrongAnswerGuide").classList.remove("hidden");
     }
     const answerUrl=paperUrl("answer");
+    el("goToAnswerPdfBtn").disabled=!answerUrl;
+    el("submittedNavigation").classList.remove("hidden");
     if(answerUrl){
       el("answerPdfFrame").src=pdfViewerUrl(answerUrl,paper.answerStartPage);
       el("answerPdfSection").classList.remove("hidden");
-      if(options.scroll!==false) setTimeout(()=>el("answerPdfSection").scrollIntoView({behavior:"smooth",block:"start"}),180);
+      if(options.scroll!==false) setTimeout(()=>el("submittedNavigation").scrollIntoView({behavior:"smooth",block:"start"}),180);
     }
     document.body.classList.remove("solving");
     el("finishExamBtn").classList.add("hidden");
@@ -1232,6 +1237,10 @@
     el("openProblemPdfBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppProblemPdf"));
     el("openAnswerPdfBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppAnswerPdf"));
     el("openSessionAnswerBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppSessionAnswerPdf"));
+    el("goToAnswerPdfBtn").addEventListener("click",()=>{
+      const section=el("answerPdfSection");
+      if(!section.classList.contains("hidden")) section.scrollIntoView({behavior:"smooth",block:"start"});
+    });
     el("answerPreviousBtn").addEventListener("click",()=>goToQuestion(currentQuestionIndex-1,{focusAnswer:true}));
     el("answerNextBtn").addEventListener("click",()=>{
       if(currentQuestionIndex<answerKey.length-1) goToQuestion(currentQuestionIndex+1,{focusAnswer:true});

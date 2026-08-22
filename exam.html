@@ -9,7 +9,7 @@
   <meta name="description" content="수능·모의고사 전체 PDF를 보며 답안을 입력하고 PDF 자체 도구로 필기하는 실전 풀이 화면">
   <meta name="robots" content="noindex">
   <title>랜덤 PDF 기출 풀이</title>
-  <link rel="stylesheet" href="css/exam.css?v=20260822-answer-nav-1">
+  <link rel="stylesheet" href="css/exam.css?v=20260822-submitted-navigation-1">
 </head>
 <body>
   <main class="exam-shell">
@@ -26,6 +26,17 @@
     </header>
 
     <section id="configSummary" class="config-summary" aria-live="polite"></section>
+
+    <section id="submittedNavigation" class="submitted-navigation hidden" aria-label="제출 후 이동">
+      <div class="submitted-navigation-pane">
+        <span class="section-kicker">문제 이동</span>
+        <div id="submittedQuestionNav" class="submitted-question-nav" aria-label="문제 이동"></div>
+      </div>
+      <div class="submitted-navigation-pane submitted-answer-navigation-pane">
+        <span class="section-kicker">정답 이동</span>
+        <button id="goToAnswerPdfBtn" class="outline-link submitted-answer-nav-btn" type="button">정답·해설 PDF로 이동</button>
+      </div>
+    </section>
 
     <section id="sessionScheduleBar" class="session-schedule-bar hidden" aria-live="polite">
       <div class="session-schedule-heading">
@@ -142,10 +153,6 @@
         </div>
         <a id="openAnswerPdfBtn" class="outline-link" target="_blank" rel="noopener">정답·해설 원본 PDF · 큰 팝업으로 열기</a>
       </div>
-      <div class="answer-pdf-question-jump">
-        <span>문제 바로가기</span>
-        <div id="answerPdfQuestionNav" class="answer-pdf-question-nav" aria-label="문제 바로가기"></div>
-      </div>
       <div class="pdf-frame-wrap answer-frame-wrap">
         <iframe id="answerPdfFrame" class="pdf-frame" title="정답 및 해설 PDF"></iframe>
       </div>
@@ -206,6 +213,6 @@
   <script src="js/github-pages-config.js?v=20260821-github-pages-2"></script>
   <script src="data/pdf-catalog.js?v=20260821-github-pages-2"></script>
   <script src="js/state.js?v=20260821-github-pages-2"></script>
-  <script src="js/exam.js?v=20260822-answer-nav-1"></script>
+  <script src="js/exam.js?v=20260822-submitted-navigation-1"></script>
 </body>
 </html>
