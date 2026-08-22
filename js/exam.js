@@ -19,6 +19,10 @@
   let tickHandle=null;
   let currentQuestionIndex=0;
   let pendingSubmittedQuestionIndex=null;
+  let problemQuestionLocations=new Map();
+  let problemQuestionLocationsGeneration=-1;
+  let problemQuestionLocationsTask=null;
+  let problemNavigationInProgress=false;
   let draftAnswers={};
   let displayedResult=null;
   let pdfViewerGeneration=0;
@@ -298,6 +302,71 @@
       pdfReadyWaiters.add(waiter);
     });
   }
+  function normalizedQuestionMarker(value){
+    return String(value??"").replace(/\s+/g,"").replace(/．/g,".").trim();
+  }
+  function questionNumberAt(items,index,wantedNumbers){
+    const marker=normalizedQuestionMarker(items[index]?.str);
+    const direct=marker.match(/^(\d+)[.)]$/);
+    if(direct&&wantedNumbers.has(direct[1])) return direct[1];
+    if(!/^\d+$/.test(marker)||!wantedNumbers.has(marker)) return "";
+    for(let next=index+1;next<items.length;next+=1){
+      const following=normalizedQuestionMarker(items[next]?.str);
+      if(!following) continue;
+      return following==="."||following===")"?marker:"";
+    }
+    return "";
+  }
+  async function getProblemQuestionLocations(){
+    const generation=pdfViewerGeneration;
+    if(problemQuestionLocationsGeneration===generation) return problemQuestionLocations;
+    if(problemQuestionLocationsTask) return problemQuestionLocationsTask;
+    const frame=el("problemPdfFrame");
+    const documentProxy=frame?.contentWindow?.PDFViewerApplication?.pdfDocument;
+    if(!documentProxy) throw new Error("문제 PDF를 아직 읽을 수 없습니다.");
+    const wantedNumbers=new Set(answerKey.map(item=>String(item.number)));
+    const task=(async()=>{
+      const found=new Map();
+      for(let pageNumber=1;pageNumber<=documentProxy.numPages&&found.size<wantedNumbers.size;pageNumber+=1){
+        if(generation!==pdfViewerGeneration) return found;
+        const page=await documentProxy.getPage(pageNumber);
+        const textContent=await page.getTextContent();
+        const items=Array.isArray(textContent?.items)?textContent.items:[];
+        for(let index=0;index<items.length;index+=1){
+          const number=questionNumberAt(items,index,wantedNumbers);
+          if(!number||found.has(number)) continue;
+          const transform=items[index]?.transform||[];
+          const x=Number(transform[4]);
+          const y=Number(transform[5]);
+          found.set(number,{pageNumber,x:Number.isFinite(x)?x:null,y:Number.isFinite(y)?y:null});
+        }
+      }
+      if(generation===pdfViewerGeneration){
+        problemQuestionLocations=found;
+        problemQuestionLocationsGeneration=generation;
+      }
+      return found;
+    })();
+    problemQuestionLocationsTask=task;
+    try{return await task;}
+    finally{if(generation===pdfViewerGeneration) problemQuestionLocationsTask=null;}
+  }
+  async function moveProblemPdfToQuestion(index){
+    const item=answerKey[index];
+    if(!item) return false;
+    await waitForPdfViewer();
+    const frame=el("problemPdfFrame");
+    const viewer=frame?.contentWindow?.PDFViewerApplication?.pdfViewer;
+    if(!viewer) throw new Error("문제 PDF 뷰어를 찾지 못했습니다.");
+    const location=(await getProblemQuestionLocations()).get(String(item.number));
+    if(!location) return false;
+    if(typeof viewer.scrollPageIntoView==="function"){
+      const options={pageNumber:location.pageNumber};
+      if(Number.isFinite(location.x)&&Number.isFinite(location.y)) options.destArray=[null,{name:"XYZ"},location.x,location.y,null];
+      viewer.scrollPageIntoView(options);
+    }else viewer.currentPageNumber=location.pageNumber;
+    return true;
+  }
   function savePracticeDraft(){
     if(mode!=="start"||isCsatSession||!paper) return;
     practiceDraftKey=practiceDraftKey||practiceDraftId();
@@ -392,6 +461,7 @@
 
   function destroyPdfView(){
     pdfViewerGeneration+=1;pdfViewerReady=false;pdfViewerDirty=false;
+    problemQuestionLocations=new Map();problemQuestionLocationsGeneration=-1;problemQuestionLocationsTask=null;problemNavigationInProgress=false;
     clearTimeout(pdfViewerReadyTimeout);pdfViewerReadyTimeout=null;
     clearInterval(pdfViewerProbeHandle);pdfViewerProbeHandle=null;pdfViewerStorageSignature=null;
     pdfReadyWaiters.forEach(waiter=>{clearTimeout(waiter.timer);waiter.reject(new Error("PDF 문서가 변경되었습니다."));});pdfReadyWaiters.clear();
@@ -1001,8 +1071,13 @@
     const nav=el("submittedQuestionNav");
     if(!nav) return;
     const selectedIndex=selectedSubmittedQuestionIndex();
-    el("goToProblemBtn").disabled=selectedIndex===null;
-    el("goToAnswerPdfBtn").disabled=selectedIndex===null;
+    const problemButton=el("goToProblemBtn");
+    const answerButton=el("goToAnswerPdfBtn");
+    if(problemButton){
+      problemButton.disabled=selectedIndex===null||problemNavigationInProgress;
+      problemButton.textContent=problemNavigationInProgress?"이동 중…":"문제 이동";
+    }
+    if(answerButton) answerButton.disabled=selectedIndex===null;
     nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" class="${index===currentQuestionIndex?"is-current":""}" data-submitted-question="${index}" aria-label="${number}번 문제 선택" aria-pressed="${index===selectedIndex}">${number}번</button>`).join("");
     nav.querySelectorAll("[data-submitted-question]").forEach(button=>button.addEventListener("click",()=>{
       pendingSubmittedQuestionIndex=Number(button.dataset.submittedQuestion);
@@ -1253,11 +1328,15 @@
       el("answerCard")?.scrollIntoView({behavior:"smooth",block:"start"});
       setTimeout(()=>el("answerSheet")?.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
     });
-    el("goToProblemBtn").addEventListener("click",()=>{
+    el("goToProblemBtn").addEventListener("click",async()=>{
       const index=selectedSubmittedQuestionIndex();
-      if(index===null) return;
+      if(index===null||problemNavigationInProgress) return;
+      problemNavigationInProgress=true;
       goToQuestion(index,{force:true,keepSubmittedSelection:true});
       el("pdfDocumentViewport")?.scrollIntoView({behavior:"smooth",block:"start"});
+      try{ await moveProblemPdfToQuestion(index); }
+      catch(error){ console.warn("선택한 문항의 PDF 위치로 이동하지 못했습니다.",error); }
+      finally{problemNavigationInProgress=false;renderSubmittedQuestionNav();}
     });
     el("answerPreviousBtn").addEventListener("click",()=>goToQuestion(currentQuestionIndex-1,{focusAnswer:true}));
     el("answerNextBtn").addEventListener("click",()=>{
