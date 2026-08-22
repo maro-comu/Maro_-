@@ -1002,6 +1002,7 @@
     if(!nav) return;
     const selectedIndex=selectedSubmittedQuestionIndex();
     el("goToProblemBtn").disabled=selectedIndex===null;
+    el("goToAnswerPdfBtn").disabled=selectedIndex===null;
     nav.innerHTML=answerKey.map(({number},index)=>`<button type="button" class="${index===currentQuestionIndex?"is-current":""}" data-submitted-question="${index}" aria-label="${number}번 문제 선택" aria-pressed="${index===selectedIndex}">${number}번</button>`).join("");
     nav.querySelectorAll("[data-submitted-question]").forEach(button=>button.addEventListener("click",()=>{
       pendingSubmittedQuestionIndex=Number(button.dataset.submittedQuestion);
@@ -1164,7 +1165,6 @@
       el("wrongAnswerGuide").classList.remove("hidden");
     }
     const answerUrl=paperUrl("answer");
-    el("goToAnswerPdfBtn").disabled=!answerUrl;
     el("submittedNavigation").classList.remove("hidden");
     if(answerUrl){
       el("answerPdfFrame").src=pdfViewerUrl(answerUrl,paper.answerStartPage);
@@ -1247,8 +1247,11 @@
     el("openAnswerPdfBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppAnswerPdf"));
     el("openSessionAnswerBtn").addEventListener("click",event=>openPdfInLargePopup(event,"studyAppSessionAnswerPdf"));
     el("goToAnswerPdfBtn").addEventListener("click",()=>{
-      const section=el("answerPdfSection");
-      if(!section.classList.contains("hidden")) section.scrollIntoView({behavior:"smooth",block:"start"});
+      const index=selectedSubmittedQuestionIndex();
+      if(index===null) return;
+      goToQuestion(index,{force:true,keepSubmittedSelection:true});
+      el("answerCard")?.scrollIntoView({behavior:"smooth",block:"start"});
+      setTimeout(()=>el("answerSheet")?.scrollIntoView({behavior:"smooth",block:"nearest"}),0);
     });
     el("goToProblemBtn").addEventListener("click",()=>{
       const index=selectedSubmittedQuestionIndex();
