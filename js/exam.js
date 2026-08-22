@@ -326,21 +326,39 @@
   function answerQuestionNumberAt(items,index,wantedNumbers){
     const marker=normalizedQuestionMarker(items[index]?.str);
     const direct=marker.match(/^(\d+)[.)](?!\d)/);
-    if(!direct||!wantedNumbers.has(direct[1])) return "";
-    const intentPattern=new RegExp(`^${direct[1]}[.)](?:\\[)?출제의도`);
-    let line=marker;
-    if(intentPattern.test(line)) return direct[1];
+    const number=direct?.[1]||(/^\d+$/.test(marker)?marker:"");
+    if(!number||!wantedNumbers.has(number)) return "";
+    const x=Number(items[index]?.transform?.[4]);
     const y=Number(items[index]?.transform?.[5]);
-    for(let next=index+1;next<items.length;next+=1){
-      const following=items[next];
-      const followingMarker=normalizedQuestionMarker(following?.str);
-      if(!followingMarker) continue;
-      const followingY=Number(following?.transform?.[5]);
-      if(Number.isFinite(y)&&Number.isFinite(followingY)&&Math.abs(followingY-y)>3) break;
-      line+=followingMarker;
-      if(intentPattern.test(line)) return direct[1];
+    const lineItems=items.map((item,itemIndex)=>({
+      itemIndex,
+      marker:normalizedQuestionMarker(item?.str),
+      x:Number(item?.transform?.[4]),
+      y:Number(item?.transform?.[5])
+    })).filter(entry=>{
+      if(!entry.marker) return false;
+      if(Number.isFinite(y)&&Number.isFinite(entry.y)&&Math.abs(entry.y-y)>3) return false;
+      if(Number.isFinite(x)&&Number.isFinite(entry.x)) return entry.x>=x-1&&entry.x<=x+205;
+      return entry.itemIndex>=index&&entry.itemIndex<=index+8;
+    }).sort((left,right)=>{
+      if(Number.isFinite(left.x)&&Number.isFinite(right.x)&&left.x!==right.x) return left.x-right.x;
+      return left.itemIndex-right.itemIndex;
+    });
+    const line=lineItems.map(entry=>entry.marker).join("");
+    const prefixPattern=new RegExp(`^${number}[.)]`);
+    if(!prefixPattern.test(line)) return "";
+    const rest=line.replace(prefixPattern,"");
+    if(!rest) return "";
+    // 일부 2022·2024 수학 정답 PDF는 '출제의도'를 아래 깨진 문자열로 추출합니다.
+    if(new RegExp(`^${number}[.)](?:\\[)?(?:출제의도|뭲뗲딮ꆚ)`).test(line)) return number;
+    if(paper?.area==="수학") return "";
+    const embeddedMarker=/(\d{1,3})[.)](?!\d)/g;
+    let match;
+    while((match=embeddedMarker.exec(rest))){
+      if(match[1]!==number&&wantedNumbers.has(match[1])) return "";
     }
-    return "";
+    if(/^[①②③④⑤⑥⑦⑧⑨⑩❶❷❸❹❺]/.test(rest)||/^(?:정답|답)(?:[:：]|$)/.test(rest)) return "";
+    return /[A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\u3400-\u9FFF\uE000-\uF8FF]/.test(rest)?number:"";
   }
   async function getProblemQuestionLocations(){
     const generation=pdfViewerGeneration;
@@ -439,12 +457,21 @@
           const y=Number(transform[5]);
           const location={pageNumber,x:Number.isFinite(x)?x:null,y:Number.isFinite(y)?y:null};
           const detailedNumber=answerQuestionNumberAt(items,index,wantedNumbers);
-          if(detailedNumber&&!detailedFound.has(detailedNumber)) detailedFound.set(detailedNumber,location);
+          if(detailedNumber){
+            if(!detailedFound.has(detailedNumber)) detailedFound.set(detailedNumber,[]);
+            detailedFound.get(detailedNumber).push(location);
+          }
           const fallbackNumber=questionNumberAt(items,index,wantedNumbers);
           if(fallbackNumber&&!fallbackFound.has(fallbackNumber)) fallbackFound.set(fallbackNumber,location);
         }
       }
-      const found=detailedFound.size?detailedFound:fallbackFound;
+      const found=new Map(fallbackFound);
+      const mathElectiveIndex=["확률과 통계","미적분","기하"].indexOf(String(paper?.subject||""));
+      detailedFound.forEach((locations,number)=>{
+        const electiveQuestion=paper?.area==="수학"&&Number(number)>=23&&mathElectiveIndex>=0;
+        const location=electiveQuestion&&locations.length>=3?locations[mathElectiveIndex]:locations[0];
+        if(location) found.set(number,location);
+      });
       if(answerPdfSource()===source){
         answerQuestionLocations=found;
         answerQuestionLocationsSource=source;
